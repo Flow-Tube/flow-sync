@@ -26,7 +26,7 @@ test("every response carries the security headers", async () => {
 
 test("unknown routes answer not_found without echoing the path", async () => {
   const { app, logs } = testApp();
-  const res = await app.request("/v1/objects/dev/secret-name");
+  const res = await app.request("/v1/nothing/secret-name");
   expect(res.status).toBe(404);
   expect(await res.json()).toEqual({ error: "not_found" });
   expect(JSON.stringify(logs)).not.toContain("secret-name");
