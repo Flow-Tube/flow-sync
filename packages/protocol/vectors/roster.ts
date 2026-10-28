@@ -1,28 +1,22 @@
 import {
-  canonical,
-  concat,
-  decodePayload,
+  buildEntry,
   type Entry,
-  encodePayload,
+  type EntryDraft,
   entryHash,
-  epochCommitment,
+  epochDraft,
   fromB64,
   fromHex,
   type MemberSecrets,
   memberId,
   memberSecrets,
-  open,
-  purposeKey,
+  memberSubject,
+  openDeviceMeta,
   type RosterState,
   replayRoster,
   type Subject,
-  seal,
+  sealDeviceMeta,
   signEntry,
-  tag,
   toB64,
-  u64,
-  utf8,
-  ZERO_HASH,
 } from "../src/index.ts";
 import { device, epochKeys, group, hex, rand, recovery, type Vectors } from "./fixtures.ts";
 
@@ -30,49 +24,26 @@ const { A, B, C } = device;
 const [R1, R2] = recovery as [MemberSecrets, MemberSecrets];
 const D = memberSecrets(rand("D sig"), rand("D kem"));
 const did = (m: MemberSecrets) => hex(m.did);
-
-const subject = (m: MemberSecrets, role: Subject["role"]): Subject => ({
-  did: did(m),
-  sig: toB64(m.sigPublic),
-  kem: toB64(m.kemPublic),
-  role,
-});
-
-const metaAad = (seq: number, did: Uint8Array) => concat(tag("meta"), group, u64(seq), did);
-const metaKey = (epoch: number) =>
-  purposeKey(epochKeys[epoch] as Uint8Array, group, epoch, "roster");
+const subject = memberSubject;
+const epochKey = (n: number) => epochKeys[n] as Uint8Array;
+const epoch = (n: number, members: MemberSecrets[]) => epochDraft(epochKey(n), group, n, members);
 
 function meta(seq: number, m: MemberSecrets, epoch: number, name: string, platform: string) {
-  const content = canonical({ app: `app-${name.toLowerCase()}`, name, platform });
-  const box = seal(
-    metaKey(epoch),
-    metaAad(seq, m.did),
-    encodePayload(utf8(content)),
+  const content = { app: `app-${name.toLowerCase()}`, name, platform };
+  return sealDeviceMeta(
+    epochKey(epoch),
+    group,
+    epoch,
+    seq,
+    m.did,
+    content,
     rand(`meta ${seq} ${name}`),
   );
-  return toB64(box);
 }
 
-const epoch = (n: number, members: MemberSecrets[]) => ({
-  n,
-  kc: toB64(epochCommitment(epochKeys[n] as Uint8Array, group, n)),
-  to: members.map(did).sort(),
-});
-
-type Draft = Omit<Entry, "v" | "group" | "seq" | "prev" | "sigs">;
-
-function entry(previous: Entry | undefined, draft: Draft, signers: MemberSecrets[]): Entry {
-  const unsigned: Entry = {
-    v: 2,
-    group: hex(group),
-    seq: previous ? previous.seq + 1 : 0,
-    prev: hex(previous ? entryHash(previous) : ZERO_HASH),
-    ...draft,
-    ...(draft.add && { add: [...draft.add].sort((a, b) => (a.did < b.did ? -1 : 1)) }),
-    ...(draft.remove && { remove: [...draft.remove].sort() }),
-    sigs: {},
-  };
-  return signers.reduce((e, m) => signEntry(e, did(m), m.sigSeed), unsigned);
+function entry(previous: Entry | undefined, draft: EntryDraft, signers: MemberSecrets[]): Entry {
+  const head = previous && { seq: previous.seq, head: hex(entryHash(previous)) };
+  return buildEntry(group, head, draft, signers);
 }
 
 function chain(): Entry[] {
@@ -283,9 +254,7 @@ function metaContents(entries: Entry[]) {
       seq: e.seq,
       did: id,
       epoch,
-      content: new TextDecoder().decode(
-        decodePayload(open(metaKey(epoch), metaAad(e.seq, fromHex(id)), fromB64(box))),
-      ),
+      content: openDeviceMeta(epochKey(epoch), group, epoch, e.seq, fromHex(id), fromB64(box)),
     }));
   });
 }

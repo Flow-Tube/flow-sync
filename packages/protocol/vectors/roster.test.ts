@@ -1,20 +1,15 @@
 import { describe, expect, test } from "vitest";
 import {
   applyEntry,
-  concat,
-  decodePayload,
   type Entry,
   entryHash,
   forkWinner,
   fromB64,
-  open,
+  openDeviceMeta,
   parseEntry,
-  purposeKey,
   type RosterState,
   replayRoster,
-  tag,
   toHex,
-  u64,
 } from "../src/index.ts";
 import { bytes, expectCode, load } from "./load.ts";
 
@@ -45,13 +40,12 @@ describe("roster", () => {
       await expectCode(() => applyEntry(base, parseEntry(n.entry)), n.error);
     });
   test("device names open with the roster key of their epoch", () => {
-    const group = bytes(v.group);
     for (const m of v.meta) {
-      const entry = entries[m.seq] as Entry;
-      const key = purposeKey(bytes(v.epochKeys[m.epoch]), group, m.epoch, "roster");
-      const aad = concat(tag("meta"), group, u64(m.seq), bytes(m.did));
-      const content = decodePayload(open(key, aad, fromB64(entry.meta?.[m.did] ?? "")));
-      expect(new TextDecoder().decode(content)).toBe(m.content);
+      const box = fromB64((entries[m.seq] as Entry).meta?.[m.did] ?? "");
+      const key = bytes(v.epochKeys[m.epoch]);
+      expect(openDeviceMeta(key, bytes(v.group), m.epoch, m.seq, bytes(m.did), box)).toBe(
+        m.content,
+      );
     }
   });
   test("forks resolve to the same winner", () => {
