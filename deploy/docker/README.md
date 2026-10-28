@@ -26,3 +26,16 @@ Use the admin token once, from Flow, to claim the instance. Set `FLOW_SYNC_ADMIN
 | `PORT` | 8080 | Listening port |
 
 Guides for NAS systems and other hosts arrive with the release.
+
+## Verifying an image
+
+Release images are signed with Sigstore (keyless, from this repository's release workflow) and carry build provenance and an SPDX SBOM. Check a release before running it:
+
+```sh
+cosign verify ghcr.io/flow-tube/flow-sync:<version> \
+  --certificate-identity-regexp '^https://github\.com/Flow-Tube/flow-sync/\.github/workflows/release\.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+gh attestation verify oci://ghcr.io/flow-tube/flow-sync:<version> -R Flow-Tube/flow-sync
+```
+
+Use cosign 3.1.3 or later. Each release is also rebuilt from scratch in CI, and the job fails unless the rebuilt image is byte-identical to the published one.
