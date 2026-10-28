@@ -3,6 +3,7 @@ export * from "./box.ts";
 export * from "./bytes.ts";
 export * from "./canonical.ts";
 export * from "./curve.ts";
+export * from "./entries.ts";
 export * from "./envelope.ts";
 export * from "./epoch.ts";
 export * from "./errors.ts";
