@@ -1,65 +1,8 @@
-import {
-  buildEntry,
-  type Entry,
-  epochDraft,
-  memberSubject,
-  randomBytes,
-  replayRoster,
-  sealChain,
-  toB64,
-  toHex,
-  wrapEpochKey,
-} from "@flow-sync/protocol";
+import { buildEntry, memberSubject, replayRoster, toHex } from "@flow-sync/protocol";
 import { describe, expect, test } from "vitest";
-import { bearer, claimedApp, postJson } from "../testing/app.ts";
+import { bearer, claimedApp } from "../testing/app.ts";
 import { newDevice, signIn } from "../testing/group.ts";
-
-type Harness = Awaited<ReturnType<typeof claimedApp>>;
-
-async function entries(h: Harness, token: string, after = -1) {
-  const res = await h.app.request(`/v1/roster?after=${after}`, bearer(token));
-  return ((await res.json()) as { entries: Entry[] }).entries;
-}
-
-async function append(h: Harness, token: string, body: unknown, head: string) {
-  const init = postJson(body, token);
-  init.headers = { ...init.headers, "if-match": `"${head}"` };
-  return h.app.request("/v1/roster", init);
-}
-
-async function addDevice(h: Harness, token: string) {
-  const state = replayRoster(await entries(h, token));
-  const joining = newDevice();
-  const entry = buildEntry(
-    h.group,
-    state,
-    { op: "add", signer: toHex(h.device.did), add: [memberSubject(joining, "device")] },
-    [h.device, joining],
-  );
-  const res = await append(h, token, { entry, wraps: {} }, state.head);
-  return { joining, res };
-}
-
-async function removal(h: Harness, token: string, removed: string) {
-  const state = replayRoster(await entries(h, token));
-  const key = randomBytes(32);
-  const remaining = [h.device, h.recovery];
-  const entry = buildEntry(
-    h.group,
-    state,
-    {
-      op: "remove",
-      signer: toHex(h.device.did),
-      remove: [removed],
-      epoch: epochDraft(key, h.group, 1, remaining),
-    },
-    [h.device],
-  );
-  const wraps: Record<string, string> = {};
-  for (const m of remaining)
-    wraps[toHex(m.did)] = toB64(await wrapEpochKey(m.kemPublic, h.group, 1, m.did, key));
-  return { entry, wraps, chain: toB64(sealChain(key, h.group, 1, h.epochKey)), head: state.head };
-}
+import { addDevice, append, entries, removal } from "../testing/roster.ts";
 
 describe("roster", () => {
   test("members read the roster from any point", async () => {

@@ -39,3 +39,11 @@ export function bearer(c: Context): string | undefined {
   const header = c.req.header("authorization");
   return header?.startsWith("Bearer ") ? header.slice(7) : undefined;
 }
+
+/** Stored bytes are only ever served as an attachment, never as content a client renders. */
+export function octets(c: Context, data: Uint8Array): Response {
+  return c.body(data.slice(), 200, {
+    "content-type": "application/octet-stream",
+    "content-disposition": "attachment",
+  });
+}
