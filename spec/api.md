@@ -76,7 +76,7 @@ The operator sets `FLOW_SYNC_ADMIN_TOKEN`, or `FLOW_SYNC_ADMIN_TOKEN_FILE` namin
 
 ### Roster appends
 
-The server validates an append with the reference roster rules ([protocol.md](protocol.md#validation)) and appends linearly: `If-Match` must name the current head. When the entry starts an epoch, the request MUST carry a wrap for every `did` in `epoch.to`, and `chain` for epochs above 0. The entry, its wraps and its chain box are stored atomically. A `remove` entry revokes the removed devices' tokens in the same transaction.
+The server validates an append with the reference roster rules ([protocol.md](protocol.md#validation)) and appends linearly: `If-Match` must name the current head. When the entry starts an epoch, the request MUST carry a wrap for every `did` in `epoch.to`, and `chain` for epochs above 0. An `add` entry MUST carry the new device's wrap of the current epoch. Any other entry carries no wraps. The entry, its wraps and its chain box are stored atomically. A `remove` entry revokes the removed devices' tokens in the same transaction.
 
 ### Objects
 

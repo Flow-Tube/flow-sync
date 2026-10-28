@@ -37,18 +37,23 @@ function decode(value: string, length: number): Uint8Array {
   return bytes;
 }
 
+/**
+ * An entry that starts an epoch carries a wrap for every member and, after genesis, the chain.
+ * An add entry carries the new device's wrap of the current epoch. Other entries carry none.
+ */
 function epochKeys(
   entry: Entry,
+  currentEpoch: number,
   wraps: Record<string, string>,
   chain: string | undefined,
 ): RosterAppend["keys"] {
+  const added = entry.op === "add" ? (entry.add ?? []).map((s) => s.did) : [];
+  const { n, to } = entry.epoch ?? { n: currentEpoch, to: added };
   const names = Object.keys(wraps).sort();
-  if (!entry.epoch) {
-    if (names.length > 0 || chain !== undefined) throw new HttpError("invalid");
-    return [];
+  const needsChain = entry.epoch !== undefined && n > 0;
+  if (names.join() !== to.join() || needsChain !== (chain !== undefined)) {
+    throw new HttpError("invalid");
   }
-  const { n, to } = entry.epoch;
-  if (names.join() !== to.join() || n > 0 !== (chain !== undefined)) throw new HttpError("invalid");
   const keys = names.map((did) => ({
     epoch: n,
     name: did,
@@ -107,7 +112,7 @@ export class Group {
       prev: before?.head,
       hash: after.head,
       entry: json,
-      keys: epochKeys(entry, wraps, chain),
+      keys: epochKeys(entry, before?.epoch ?? 0, wraps, chain),
     });
     if (!appended) throw new HttpError("conflict", { head: (await this.roster())?.head });
     this.#state = after;

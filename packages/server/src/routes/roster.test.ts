@@ -14,14 +14,31 @@ describe("roster", () => {
     expect(await entries(h, recoveryToken)).toHaveLength(1);
   });
 
-  test("an added device can sign in", async () => {
+  test("an added device can sign in and read its wrap of the current epoch", async () => {
     const h = await claimedApp();
     const token = await signIn(h.app, h.device, h.group);
     const { joining, res } = await addDevice(h, token);
     expect(res.status).toBe(201);
+    const wrapUrl = `/v1/keys/00000000/${toHex(joining.did)}.k`;
+    const joined = await signIn(h.app, joining, h.group);
+    expect((await h.app.request(wrapUrl, bearer(joined))).status).toBe(200);
     expect(await entries(h, token)).toHaveLength(2);
     const joinedToken = await signIn(h.app, joining, h.group);
     expect((await h.app.request("/v1/status", bearer(joinedToken))).status).toBe(200);
+  });
+
+  test("an add entry must carry the new device's wrap", async () => {
+    const h = await claimedApp();
+    const token = await signIn(h.app, h.device, h.group);
+    const state = replayRoster(await entries(h, token));
+    const joining = newDevice();
+    const entry = buildEntry(
+      h.group,
+      state,
+      { op: "add", signer: toHex(h.device.did), add: [memberSubject(joining, "device")] },
+      [h.device, joining],
+    );
+    expect((await append(h, token, { entry, wraps: {} }, state.head)).status).toBe(400);
   });
 
   test("an append naming a stale head is refused with the current head", async () => {
