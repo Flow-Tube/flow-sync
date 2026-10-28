@@ -90,7 +90,7 @@ Garbage collection is client-driven, as on every backend ([protocol.md](protocol
 
 ### Pairing mailbox
 
-A member opens a slot with `slot = Hash("pair", t)[0..16]`. Knowing the slot id is the capability: the new device has no token yet, and only someone who read the QR code knows `t`. A slot holds at most 8 messages of at most 8 KiB in each direction, expires after 180 seconds, and an instance holds at most 3 open slots.
+A member opens a slot with `slot = Hash("pair", t)[0..16]`. Knowing the slot id is the capability: the new device has no token yet, and only someone who read the QR code knows `t`. A slot holds at most 8 messages of at most 8 KiB in each direction, expires after 180 seconds, and an instance holds at most 3 open slots. Devices poll the mailbox no more than once every 2 seconds, which keeps a device without a token inside the per-address request limit.
 
 ## Limits
 

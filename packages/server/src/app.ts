@@ -11,6 +11,7 @@ import { claimRoutes } from "./routes/claim.ts";
 import { keyRoutes } from "./routes/keys.ts";
 import { metaRoutes } from "./routes/meta.ts";
 import { objectRoutes } from "./routes/objects.ts";
+import { pairRoutes } from "./routes/pair.ts";
 import { rosterRoutes } from "./routes/roster.ts";
 import { statusRoutes } from "./routes/status.ts";
 import type { Storage } from "./storage/types.ts";
@@ -55,6 +56,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", rosterRoutes(members));
   app.route("/", keyRoutes(members));
   app.route("/", objectRoutes({ ...members, blobs: deps.storage.blobs }, deps.config));
+  app.route("/", pairRoutes(members));
   app.route("/", statusRoutes(members, deps.config));
   return app;
 }
