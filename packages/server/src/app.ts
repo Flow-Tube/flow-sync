@@ -8,6 +8,7 @@ import { type Logger, requestLog } from "./http/log.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { claimRoutes } from "./routes/claim.ts";
 import { metaRoutes } from "./routes/meta.ts";
+import { rosterRoutes } from "./routes/roster.ts";
 import { statusRoutes } from "./routes/status.ts";
 import type { Storage } from "./storage/types.ts";
 
@@ -45,6 +46,7 @@ export function createApp(deps: AppDeps) {
   const members = { group, meta: deps.storage.meta, now: deps.now };
   app.route("/", claimRoutes(deps.config, group));
   app.route("/", authRoutes(members));
+  app.route("/", rosterRoutes(members));
   app.route("/", statusRoutes(members, deps.config));
   return app;
 }

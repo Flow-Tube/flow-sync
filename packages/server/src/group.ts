@@ -98,13 +98,15 @@ export class Group {
 
   /** Validates an entry with its wraps and appends it, or fails with the current head. */
   async append(entry: Entry, wraps: Record<string, string>, chain?: string): Promise<void> {
+    const json = canonical(entry as Json);
+    if (json.length > LIMITS.rosterEntry) throw new HttpError("too_large");
     const before = await this.roster();
     const after = applyEntry(before, entry);
     const appended = await this.#meta.appendRoster({
       seq: entry.seq,
       prev: before?.head,
       hash: after.head,
-      entry: canonical(entry as Json),
+      entry: json,
       keys: epochKeys(entry, wraps, chain),
     });
     if (!appended) throw new HttpError("conflict", { head: (await this.roster())?.head });
