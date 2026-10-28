@@ -3,6 +3,7 @@ import type { AppEnv } from "../env.ts";
 import type { Group } from "../group.ts";
 import { bearer } from "../http/body.ts";
 import { HttpError } from "../http/errors.ts";
+import { checkRate, type Guards } from "../limits/guards.ts";
 import type { MetaStore } from "../storage/types.ts";
 import { readToken } from "./token.ts";
 
@@ -10,6 +11,7 @@ export interface AuthDeps {
   group: Group;
   meta: MetaStore;
   now: () => number;
+  guards: Guards;
 }
 
 /**
@@ -28,6 +30,7 @@ export function requireMember(
     const member = claims && state.members.get(claims.did);
     if (!claims || !member) throw new HttpError("unauthorized");
     if (member.role === "recovery" && !allowRecovery) throw new HttpError("forbidden");
+    checkRate(deps.guards.devices, claims.did, deps.now());
     if (member.role === "device") await deps.meta.touchDevice(claims.did, deps.now());
     c.set("did", claims.did);
     await next();

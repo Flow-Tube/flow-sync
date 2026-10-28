@@ -4,13 +4,17 @@ import type { Config } from "../config.ts";
 import type { AppEnv } from "../env.ts";
 import { bearer } from "../http/body.ts";
 import { HttpError } from "../http/errors.ts";
+import { checkBan, type Guards } from "../limits/guards.ts";
 
 /** Compares hashes of equal length, so the check takes the same time for any token. */
-export function requireAdmin(config: Config): MiddlewareHandler<AppEnv> {
+export function requireAdmin(config: Config, guards: Guards): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
+    const ip = guards.clientIp(c) ?? "unknown";
+    checkBan(guards.adminFailures, ip, guards.now());
     const token = bearer(c);
     const expected = config.adminTokenHash;
     if (!expected || !token || !equalBytes(sha256(utf8(token)), expected)) {
+      guards.adminFailures.fail(ip, guards.now());
       throw new HttpError("unauthorized");
     }
     await next();

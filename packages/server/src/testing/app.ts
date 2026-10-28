@@ -12,7 +12,13 @@ export function testApp(overrides: Partial<Config> = {}) {
   const clock = { now: 1_793_232_000_000 };
   const config = { ...loadConfig({ FLOW_SYNC_ADMIN_TOKEN: ADMIN_TOKEN }, true), ...overrides };
   const storage = openSqlite(":memory:");
-  const app = createApp({ config, storage, log: (line) => logs.push(line), now: () => clock.now });
+  const app = createApp({
+    config,
+    storage,
+    log: (line) => logs.push(line),
+    now: () => clock.now,
+    clientIp: (c) => c.req.header("x-test-ip"),
+  });
   return { app, logs, clock, config, storage };
 }
 

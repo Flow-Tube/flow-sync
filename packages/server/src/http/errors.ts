@@ -22,11 +22,13 @@ export type ErrorCode = keyof typeof STATUS;
 export class HttpError extends Error {
   readonly code: ErrorCode;
   readonly extra: Record<string, unknown>;
+  readonly retryAfterSeconds: number | undefined;
 
-  constructor(code: ErrorCode, extra: Record<string, unknown> = {}) {
+  constructor(code: ErrorCode, extra: Record<string, unknown> = {}, retryAfterSeconds?: number) {
     super(code);
     this.code = code;
     this.extra = extra;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -40,5 +42,8 @@ export function errorCode(error: unknown): ErrorCode {
 export function errorResponse(c: Context, error: unknown): Response {
   const code = errorCode(error);
   const extra = error instanceof HttpError ? error.extra : {};
+  if (error instanceof HttpError && error.retryAfterSeconds !== undefined) {
+    c.header("Retry-After", String(error.retryAfterSeconds));
+  }
   return c.json({ error: code, ...extra }, STATUS[code]);
 }
