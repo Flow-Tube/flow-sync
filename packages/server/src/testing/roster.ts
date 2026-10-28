@@ -35,7 +35,9 @@ export async function addDevice(h: Harness, token: string) {
     { op: "add", signer: toHex(h.device.did), add: [memberSubject(joining, "device")] },
     [h.device, joining],
   );
-  const res = await append(h, token, { entry, wraps: {} }, state.head);
+  const wrap = await wrapEpochKey(joining.kemPublic, h.group, 0, joining.did, h.epochKey);
+  const wraps = { [toHex(joining.did)]: toB64(wrap) };
+  const res = await append(h, token, { entry, wraps }, state.head);
   return { joining, res };
 }
 

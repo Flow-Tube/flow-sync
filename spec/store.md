@@ -22,7 +22,7 @@ probe/<random:32>                              setup probe, deleted right after
 ### Writing rules
 
 - **One writer per path.** Only device `did` writes under `dev/<did>/`. A roster entry or wrap is written by the device that creates it. Nothing is ever overwritten.
-- **Wraps before entries.** A device writes every wrap (and `chain.k`) for a new epoch before the roster entry that starts it. An entry whose wraps are missing is not usable yet; readers retry later.
+- **Wraps before entries.** A device writes every wrap (and `chain.k`) for a new epoch before the roster entry that starts it, and the new device's wrap of the current epoch before an `add` entry. An entry whose wraps are missing is not usable yet; readers retry later.
 - **Size.** An object is at most 4 MiB (4,194,304 bytes). Snapshot blobs SHOULD hold at most 2 MiB of payload. This stays below S3 multipart, Nextcloud chunked upload, and serverless body limits.
 - **Deleting.** Only garbage collection deletes ([protocol.md](protocol.md#garbage-collection)), and on WebDAV, S3 and LAN peers a device deletes only its own paths.
 
