@@ -4,6 +4,7 @@
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
+    "build": "esbuild src/entry/node.ts src/entry/healthcheck.ts --bundle --platform=node --target=node24 --format=cjs --out-extension:.js=.cjs --outdir=dist --legal-comments=eof",
     "start": "node src/entry/node.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
@@ -19,6 +20,7 @@
   "devDependencies": {
     "@types/node": "^24.19.2",
     "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
     "fast-check": "^4.10.2",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"

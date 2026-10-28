@@ -1,0 +1,3 @@
+{$FLOW_SYNC_DOMAIN} {
+	reverse_proxy flow-sync:8080
+}
