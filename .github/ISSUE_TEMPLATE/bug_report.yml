@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in the server, the reference library or the specification is wrong.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected, what happened instead, and how to reproduce it.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+    validations:
+      required: true
+  - type: dropdown
+    id: host
+    attributes:
+      label: Where the server runs
+      options:
+        - Docker
+        - Cloudflare Workers
+        - Vercel
+        - Netlify
+        - Heroku
+        - Railway
+        - Render
+        - Fly.io
+        - Not about the server
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Server logs never contain content or keys, but check before pasting. Never paste recovery words or admin tokens.
+      render: text
