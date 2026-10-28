@@ -5,6 +5,7 @@ import type { AppEnv } from "./env.ts";
 import { Group } from "./group.ts";
 import { errorCode, errorResponse, HttpError } from "./http/errors.ts";
 import { type Logger, requestLog } from "./http/log.ts";
+import { type ClientIp, createGuards, guardRequests } from "./limits/guards.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { claimRoutes } from "./routes/claim.ts";
 import { keyRoutes } from "./routes/keys.ts";
@@ -19,6 +20,7 @@ export interface AppDeps {
   storage: Storage;
   log: Logger;
   now: () => number;
+  clientIp: ClientIp;
 }
 
 export function createApp(deps: AppDeps) {
@@ -35,6 +37,8 @@ export function createApp(deps: AppDeps) {
     await next();
     c.header("Cache-Control", "no-store");
   });
+  const guards = createGuards(deps.clientIp, deps.now);
+  app.use(guardRequests(guards));
   app.onError((error, c) => {
     c.set("errorCode", errorCode(error));
     return errorResponse(c, error);
@@ -45,8 +49,8 @@ export function createApp(deps: AppDeps) {
   });
   const group = new Group(deps.storage.meta);
   app.route("/", metaRoutes(deps.config, group));
-  const members = { group, meta: deps.storage.meta, now: deps.now };
-  app.route("/", claimRoutes(deps.config, group));
+  const members = { group, meta: deps.storage.meta, now: deps.now, guards };
+  app.route("/", claimRoutes(deps.config, group, guards));
   app.route("/", authRoutes(members));
   app.route("/", rosterRoutes(members));
   app.route("/", keyRoutes(members));
