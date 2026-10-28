@@ -1,5 +1,8 @@
 import { describe, expect, test } from "vitest";
-import { ADMIN_TOKEN, adminJson, testApp } from "../testing/app.ts";
+import { ADMIN_TOKEN, postJson, testApp } from "../testing/app.ts";
+
+const adminJson = (body: unknown, token = ADMIN_TOKEN) => postJson(body, token);
+
 import { genesis } from "../testing/group.ts";
 
 const info = async (app: ReturnType<typeof testApp>["app"]) =>

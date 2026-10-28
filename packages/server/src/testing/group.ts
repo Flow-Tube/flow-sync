@@ -1,10 +1,16 @@
 import {
   buildEntry,
+  concat,
   epochDraft,
+  fromB64,
+  fromHex,
+  type MemberSecrets,
   memberSecrets,
   memberSubject,
   randomBytes,
   recoveryKeys,
+  sign,
+  tag,
   toB64,
   toHex,
   wrapEpochKey,
@@ -36,4 +42,23 @@ export async function genesis() {
     );
   }
   return { group, device, recovery, epochKey, entry, wraps };
+}
+
+type App = { request: (path: string, init?: RequestInit) => Response | Promise<Response> };
+
+const post = (body: unknown): RequestInit => ({
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+/** Runs the challenge and token exchange the way a device does. */
+export async function signIn(app: App, member: MemberSecrets, group: Uint8Array): Promise<string> {
+  const did = toHex(member.did);
+  const res = await app.request("/v1/auth/challenge", post({ did }));
+  const { challenge, instance } = (await res.json()) as { challenge: string; instance: string };
+  const message = concat(tag("auth"), fromHex(instance), group, fromB64(challenge));
+  const signature = toB64(sign(member.sigSeed, message));
+  const tokenRes = await app.request("/v1/auth/token", post({ did, challenge, sig: signature }));
+  return ((await tokenRes.json()) as { token: string }).token;
 }

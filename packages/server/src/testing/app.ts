@@ -2,6 +2,7 @@ import { createApp } from "../app.ts";
 import { type Config, loadConfig } from "../config.ts";
 import type { LogLine } from "../http/log.ts";
 import { openSqlite } from "../storage/sqlite.ts";
+import { genesis } from "./group.ts";
 
 export const ADMIN_TOKEN = "admin-token-for-tests-0123456789abcdef";
 
@@ -15,10 +16,24 @@ export function testApp(overrides: Partial<Config> = {}) {
   return { app, logs, clock, config, storage };
 }
 
-export function adminJson(body: unknown, token = ADMIN_TOKEN): RequestInit {
-  return {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify(body),
-  };
+export function postJson(body: unknown, token?: string): RequestInit {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (token) headers.authorization = `Bearer ${token}`;
+  return { method: "POST", headers, body: JSON.stringify(body) };
+}
+
+export const bearer = (token: string): RequestInit => ({
+  headers: { authorization: `Bearer ${token}` },
+});
+
+/** An instance already claimed by a fresh group, plus that group's keys. */
+export async function claimedApp(overrides: Partial<Config> = {}) {
+  const harness = testApp(overrides);
+  const fixture = await genesis();
+  const res = await harness.app.request(
+    "/v1/claim",
+    postJson({ entry: fixture.entry, wraps: fixture.wraps }, ADMIN_TOKEN),
+  );
+  if (res.status !== 201) throw new Error(`claim failed: ${res.status}`);
+  return { ...harness, ...fixture };
 }
