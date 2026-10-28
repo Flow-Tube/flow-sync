@@ -38,12 +38,17 @@ export function authRoutes({ group, meta, now }: AuthDeps) {
     .use(limitBody(LIMITS.jsonBody))
     .post("/v1/auth/challenge", async (c) => {
       const body = await readJson(c, challengeSchema);
-      await group.claimed();
+      const state = await group.claimed();
       await meta.purgeExpired(now());
       const challenge = randomBytes(32);
       await meta.putChallenge(toHex(challenge), body.did, now() + LIMITS.challengeMs);
       const instance = await group.instance();
-      return c.json({ challenge: toB64(challenge), instance: toHex(instance.id), time: now() });
+      return c.json({
+        challenge: toB64(challenge),
+        instance: toHex(instance.id),
+        group: state.group,
+        time: now(),
+      });
     })
     .post("/v1/auth/token", async (c) => {
       const body = await readJson(c, tokenSchema);

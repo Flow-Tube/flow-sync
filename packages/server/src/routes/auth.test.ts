@@ -4,7 +4,7 @@ import { LIMITS } from "../limits.ts";
 import { bearer, claimedApp, postJson, testApp } from "../testing/app.ts";
 import { newDevice, signIn } from "../testing/group.ts";
 
-type Challenge = { challenge: string; instance: string; time: number };
+type Challenge = { challenge: string; instance: string; group: string; time: number };
 
 async function challenge(app: Awaited<ReturnType<typeof claimedApp>>["app"], did: string) {
   return (await (await app.request("/v1/auth/challenge", postJson({ did }))).json()) as Challenge;
@@ -31,6 +31,7 @@ describe("device authentication", () => {
       ).status;
     };
     const first = await challenge(app, did);
+    expect(first.group).toBe(toHex(group));
     expect(await exchange(first)).toBe(200);
     expect(await exchange(first)).toBe(401);
     const stale = await challenge(app, did);

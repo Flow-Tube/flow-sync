@@ -29,7 +29,7 @@ Devices have no passwords. A device proves it holds a roster key and gets a shor
 
 ```
 POST /v1/auth/challenge   {"did":"<hex>"}
-→ 200 {"challenge":"<b64, 32 bytes>","instance":"<hex, 16 bytes>","time":<ms>}
+→ 200 {"challenge":"<b64, 32 bytes>","instance":"<hex, 16 bytes>","group":"<hex, 16 bytes>","time":<ms>}
 
 POST /v1/auth/token       {"did":"<hex>","challenge":"<b64>","sig":"<b64>"}
 → 200 {"token":"<opaque>","expires":<ms>}
@@ -39,6 +39,7 @@ POST /v1/auth/token       {"did":"<hex>","challenge":"<b64>","sig":"<b64>"}
 - A challenge is single-use and expires after 60 seconds.
 - A token lasts at most 15 minutes and is bound to the `did`. Every request re-checks that the `did` is still a current device, so removal takes effect at once.
 - `time` lets a device notice clock drift; no protocol step depends on it.
+- `group` lets a device restoring from the recovery key, which knows only the server, sign in. The group id isn't secret: every object header carries it.
 - Requests send `Authorization: Bearer <token>`.
 
 Tokens are bearer tokens. That is acceptable because data integrity never depends on them: every object is signed end to end, and object names are immutable, so a replayed write changes nothing.
