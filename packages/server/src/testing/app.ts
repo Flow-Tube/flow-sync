@@ -1,6 +1,7 @@
 import { createApp } from "../app.ts";
 import { type Config, loadConfig } from "../config.ts";
 import type { LogLine } from "../http/log.ts";
+import { upgradeWebSocket } from "../runtime/node.ts";
 import { openSqlite } from "../storage/sqlite.ts";
 import { genesis } from "./group.ts";
 
@@ -12,14 +13,15 @@ export function testApp(overrides: Partial<Config> = {}) {
   const clock = { now: 1_793_232_000_000 };
   const config = { ...loadConfig({ FLOW_SYNC_ADMIN_TOKEN: ADMIN_TOKEN }, true), ...overrides };
   const storage = openSqlite(":memory:");
-  const app = createApp({
+  const { app, hub } = createApp({
     config,
     storage,
     log: (line) => logs.push(line),
     now: () => clock.now,
     clientIp: (c) => c.req.header("x-test-ip"),
+    upgradeWebSocket,
   });
-  return { app, logs, clock, config, storage };
+  return { app, hub, logs, clock, config, storage };
 }
 
 export function postJson(body: unknown, token?: string): RequestInit {

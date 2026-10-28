@@ -26,7 +26,7 @@ The first `play` or `cmd` from a device asks the user on the receiving device: a
 
 - Binary frames are envelopes. The server checks the length (at most 64 KiB), the group, that the sender is the token's device, and the signature. It then forwards the frame to the group's other connections and keeps nothing.
 - Text frames come only from the server: `{"type":"peers","online":["<did>", …]}` whenever the set of connected devices changes.
-- The server pings every 15 seconds and closes a connection whose token expires or whose device is removed. Clients reconnect with a fresh token.
+- Clients ping every 15 seconds. The server checks its connections at least every 15 seconds and closes any whose token has expired or whose device was removed. Clients reconnect with a fresh token.
 - Per device: at most 20 messages per second and 2 connections.
 
 Docker, the container hosts and Cloudflare Workers (through one Durable Object per instance using the WebSocket Hibernation API) carry the live channel. On Vercel and Netlify, `/v1/info` reports `"live": false`, and apps hide handoff and remote control there unless the devices share a LAN.
