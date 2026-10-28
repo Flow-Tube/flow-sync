@@ -28,6 +28,10 @@ updates:
     directories: [/deploy/docker]
     schedule:
       interval: weekly
+    ignore:
+      # Node majors alternate between LTS and short-lived releases; move to a new LTS by hand.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
     cooldown:
       default-days: 7
     commit-message:
