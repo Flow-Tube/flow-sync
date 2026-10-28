@@ -6,6 +6,7 @@ import { Group } from "./group.ts";
 import { errorCode, errorResponse, HttpError } from "./http/errors.ts";
 import { type Logger, requestLog } from "./http/log.ts";
 import { type ClientIp, createGuards, guardRequests } from "./limits/guards.ts";
+import { adminRoutes } from "./routes/admin.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { claimRoutes } from "./routes/claim.ts";
 import { keyRoutes } from "./routes/keys.ts";
@@ -52,6 +53,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", metaRoutes(deps.config, group));
   const members = { group, meta: deps.storage.meta, now: deps.now, guards };
   app.route("/", claimRoutes(deps.config, group, guards));
+  app.route("/", adminRoutes(deps.config, group, deps.storage.meta, guards));
   app.route("/", authRoutes(members));
   app.route("/", rosterRoutes(members));
   app.route("/", keyRoutes(members));

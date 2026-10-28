@@ -112,4 +112,9 @@ export class Group {
     if (!appended) throw new HttpError("conflict", { head: (await this.roster())?.head });
     this.#state = after;
   }
+
+  /** Drops the cached roster after the group is deleted. */
+  forget(): void {
+    this.#state = undefined;
+  }
 }
