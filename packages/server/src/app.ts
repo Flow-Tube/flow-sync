@@ -5,8 +5,10 @@ import type { AppEnv } from "./env.ts";
 import { Group } from "./group.ts";
 import { errorCode, errorResponse, HttpError } from "./http/errors.ts";
 import { type Logger, requestLog } from "./http/log.ts";
+import { authRoutes } from "./routes/auth.ts";
 import { claimRoutes } from "./routes/claim.ts";
 import { metaRoutes } from "./routes/meta.ts";
+import { statusRoutes } from "./routes/status.ts";
 import type { Storage } from "./storage/types.ts";
 
 export interface AppDeps {
@@ -40,6 +42,9 @@ export function createApp(deps: AppDeps) {
   });
   const group = new Group(deps.storage.meta);
   app.route("/", metaRoutes(deps.config, group));
+  const members = { group, meta: deps.storage.meta, now: deps.now };
   app.route("/", claimRoutes(deps.config, group));
+  app.route("/", authRoutes(members));
+  app.route("/", statusRoutes(members, deps.config));
   return app;
 }
