@@ -1,15 +1,18 @@
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
+import type { UpgradeWebSocket } from "hono/ws";
 import type { Config } from "./config.ts";
 import type { AppEnv } from "./env.ts";
 import { Group } from "./group.ts";
 import { errorCode, errorResponse, HttpError } from "./http/errors.ts";
 import { type Logger, requestLog } from "./http/log.ts";
 import { type ClientIp, createGuards, guardRequests } from "./limits/guards.ts";
+import { LiveHub } from "./live/hub.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { claimRoutes } from "./routes/claim.ts";
 import { keyRoutes } from "./routes/keys.ts";
+import { liveRoutes } from "./routes/live.ts";
 import { metaRoutes } from "./routes/meta.ts";
 import { objectRoutes } from "./routes/objects.ts";
 import { pairRoutes } from "./routes/pair.ts";
@@ -23,6 +26,8 @@ export interface AppDeps {
   log: Logger;
   now: () => number;
   clientIp: ClientIp;
+  /** Absent on hosts that can't hold connections open; live features are then off. */
+  upgradeWebSocket?: UpgradeWebSocket;
 }
 
 export function createApp(deps: AppDeps) {
@@ -60,5 +65,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", objectRoutes({ ...members, blobs: deps.storage.blobs }, deps.config));
   app.route("/", pairRoutes(members));
   app.route("/", statusRoutes(members, deps.config));
-  return app;
+  const hub = new LiveHub(group, deps.now);
+  if (deps.upgradeWebSocket) app.route("/", liveRoutes(members, hub, deps.upgradeWebSocket));
+  return { app, hub };
 }

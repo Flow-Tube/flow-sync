@@ -20,12 +20,12 @@ export interface AuthDeps {
  */
 export function requireMember(
   deps: AuthDeps,
-  { allowRecovery = false } = {},
+  { allowRecovery = false, token: tokenOf = bearer } = {},
 ): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     const state = await deps.group.claimed();
     const { secret } = await deps.group.instance();
-    const token = bearer(c);
+    const token = tokenOf(c);
     const claims = token ? readToken(secret, token, deps.now()) : undefined;
     const member = claims && state.members.get(claims.did);
     if (!claims || !member) throw new HttpError("unauthorized");
@@ -33,6 +33,7 @@ export function requireMember(
     checkRate(deps.guards.devices, claims.did, deps.now());
     if (member.role === "device") await deps.meta.touchDevice(claims.did, deps.now());
     c.set("did", claims.did);
+    c.set("tokenExpires", claims.expires);
     await next();
   };
 }

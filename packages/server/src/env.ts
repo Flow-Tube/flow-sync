@@ -6,5 +6,7 @@ export interface AppEnv {
     errorCode: ErrorCode;
     /** The authenticated member, set by requireMember. */
     did: string;
+    /** When the member's token expires. */
+    tokenExpires: number;
   };
 }
