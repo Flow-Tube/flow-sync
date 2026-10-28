@@ -145,7 +145,7 @@ A reader keeps, per sender, the last `seq` and hash it verified:
 - The next object must have `seq` + 1 and the matching `prev`.
 - An object at or below the last `seq` is a replay and is ignored. If its bytes differ from what was verified, the store is misbehaving and the device warns.
 - A gap means the store is withholding, or hasn't caught up. The reader waits; it doesn't skip.
-- A device that has never read a sender starts at the sender's oldest available object, or at the snapshot it bootstraps from.
+- A device that has never read a sender starts at its first object (`seq` 1, `prev` all zeros), or right after the sender's entry in the version vector of the snapshot it bootstraps from. A store therefore can't hide the beginning of a log.
 
 A device that sees the roster head, or any sender's `seq`, go backwards stops writing and warns that the store rolled back.
 
