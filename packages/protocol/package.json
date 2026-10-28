@@ -8,7 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "vectors": "node vectors/generate.ts"
   },
   "dependencies": {
     "@hpke/core": "^1.9.0",
