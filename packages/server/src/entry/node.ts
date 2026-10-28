@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { serve } from "@hono/node-server";
 import { createApp } from "../app.ts";
 import { loadConfig } from "../config.ts";
+import { openSqlite } from "../storage/sqlite.ts";
 
 const env = { ...process.env };
 if (env.FLOW_SYNC_ADMIN_TOKEN_FILE) {
@@ -10,6 +11,7 @@ if (env.FLOW_SYNC_ADMIN_TOKEN_FILE) {
 
 const app = createApp({
   config: loadConfig(env, true),
+  storage: openSqlite(env.FLOW_SYNC_DATA ?? "/data/flow-sync.db"),
   log: (line) => console.log(JSON.stringify(line)),
   now: Date.now,
 });

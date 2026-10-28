@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { testApp } from "./testing.ts";
+import { testApp } from "./testing/app.ts";
 
 test("health, info and the root status", async () => {
   const { app } = testApp();
