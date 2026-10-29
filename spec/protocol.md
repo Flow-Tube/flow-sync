@@ -88,7 +88,7 @@ FLOW-SYNC/1 apps reject `v:2` and ask the user to update. FLOW-SYNC/2 apps still
 
 ### Channel
 
-The scanner reaches the shower over the LAN when an `l` address answers. Otherwise, when the shower is a member, it uses the store's pairing mailbox ([store.md](store.md#pairing-mailbox)). Both sides derive `K_ab`, `K_ba` and the SAS ([crypto.md](crypto.md#pairing)). Every message is a box, numbered from 0 in each direction. The scanner's first message starts with its ephemeral X25519 public key (32 bytes), in the clear, followed by the box: the shower needs that key to derive the keys that open it.
+The scanner reaches the shower over the LAN when an `l` address answers. Otherwise, when the shower is a member, it uses the store's pairing mailbox ([store.md](store.md#pairing-mailbox)). On a Flow server the mailbox needs no credentials. On WebDAV and S3 it does, so the scanner uses it only when the user entered that store's credentials before scanning; otherwise both devices must be on the same LAN. Both sides derive `K_ab`, `K_ba` and the SAS ([crypto.md](crypto.md#pairing)). Every message is a box, numbered from 0 in each direction. The scanner's first message starts with its ephemeral X25519 public key (32 bytes), in the clear, followed by the box: the shower needs that key to derive the keys that open it.
 
 The scanner first sends its ephemeral X25519 public key (32 bytes) in the clear, because the shower needs it to derive the keys:
 
@@ -118,7 +118,7 @@ Each message is canonical JSON with a `type`, carried as a payload in a box.
 | 2 | M | `entry` | The `add` entry for N, signed by M except for `sigs[N]` |
 | 3 | N | `accept` | N's signature over that entry |
 | | M | | M appends the completed entry and N's wrap to the store |
-| 4 | M | `welcome` | `group`, `head` and `seq` (the roster head after the `add`), `link` (the link id of the member's synced profile, which the new device's Default profile joins), and `store`: for a Flow server `{"k":"server","u":url,"i":instance}`, for WebDAV or S3 the location and credentials, for a [LAN group](live.md#lan-groups) `{"k":"lan"}`, with `entries` and `wrap` next to it |
+| 4 | M | `welcome` | `group`, `head` and `seq` (the roster head after the `add`), `link` (the link id of the member's synced profile, which the new device's Default profile joins), and `store`: for a Flow server `{"k":"server","u":url,"i":instance}`, for WebDAV `{"k":"webdav","u":url,"n":user,"w":password}`, for S3 `{"k":"s3","u":endpoint,"b":bucket,"g":region,"x":prefix,"y":"path" or "host","a":access key id,"s":secret}` (credentials travel only inside the pairing boxes and are stored in the platform keystore), for a [LAN group](live.md#lan-groups) `{"k":"lan"}`, with `entries` and `wrap` next to it |
 | 5 | N | `done` | N has verified the roster from genesis to that head, unwrapped `K_e` and checked `kc` |
 
 N pins the head from `welcome`. A store that later shows N a different history at or below that `seq` is treated as a fork.
