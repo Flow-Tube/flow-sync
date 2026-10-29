@@ -21,7 +21,8 @@ The object envelope's suite byte names the algorithms. FLOW-SYNC/2 defines suite
 
 | | Android | Desktop | Reference and server |
 |---|---|---|---|
-| Ed25519, X25519, HPKE | Conscrypt 2.6.1, already bundled in Flow (`Conscrypt.newProvider()`, `HpkeContextSender`/`HpkeContextRecipient`) | `ed25519-dalek`, `x25519-dalek`, `hpke` | `@noble/curves`, `@hpke/core` |
+| Ed25519, X25519 | BouncyCastle `bcprov-jdk18on` (`Ed25519`, `X25519`); Conscrypt's API can't derive a public key from a seed, which recovery keys need | `ed25519-dalek`, `x25519-dalek` | `@noble/curves` |
+| HPKE | Conscrypt 2.6.1, already bundled in Flow (`Conscrypt.newProvider()`, `HpkeContextSender`/`HpkeContextRecipient`) | `hpke` | `@hpke/core` |
 | HKDF, HMAC, SHA-256 | JCE `HmacSHA256`, `SHA-256` | `hkdf`, `hmac`, `sha2` | `@noble/hashes` |
 | AES-256-GCM | JCE `AES/GCM/NoPadding` | `aes-gcm` | `@noble/ciphers` |
 
@@ -185,5 +186,5 @@ The QR code holds the same 24 words separated by single spaces. Devices store on
 | Group key management | Signed roster with epoch keys wrapped by HPKE | **MLS** ([RFC 9420](https://www.rfc-editor.org/rfc/rfc9420)): deletes keys after use and gives new members no history ([RFC 9750 §6](https://www.rfc-editor.org/rfc/rfc9750)), needs a delivery service that orders one commit per epoch (WebDAV and S3 can't), treats a recovery key as a long-offline member, and costs an estimated 1 to 2.5 MB per Android ABI. Borrowed from MLS: labelled derivation, purpose keys, the epoch commitment, group context in every AAD, and a suite byte. |
 | Bulk encryption | AES-256-GCM with a derived key per box and a commitment | **Plain AES-GCM with random nonces**: a 2<sup>32</sup> cap per key that devices can't coordinate. **XChaCha20-Poly1305**: no RFC (the draft expired in 2020) and no Android API. **AES-GCM-SIV**: Android API 30+ only, and the Rust crate has never been audited. |
 | HPKE AEAD | AES-256-GCM | ChaCha20-Poly1305 needs Android API 28. |
-| Android library | Conscrypt 2.6.1 already in the APK (≈0 KB) | BouncyCastle Ed25519/X25519 classes (≈40 to 90 KB) remain the fallback. Tink, libsodium and a newer standalone Conscrypt cost 0.5 to 5 MB. |
+| Android library | Conscrypt 2.6.1, already in the APK, for HPKE; BouncyCastle for Ed25519 and X25519. With the BIP39 word list they add 14.7 KB to the FOSS APK after R8. | **Conscrypt alone**: its public API can't derive an Ed25519 public key from a seed, which recovery keys need. Tink, libsodium and a newer standalone Conscrypt cost 0.5 to 5 MB. |
 | Signature verification on the server | `@noble/curves`, strict mode | WebCrypto Ed25519 differs between runtimes in edge cases. |
