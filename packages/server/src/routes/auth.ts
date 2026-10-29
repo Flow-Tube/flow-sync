@@ -34,9 +34,9 @@ function decode(value: string): Uint8Array {
 }
 
 export function authRoutes({ group, meta, now }: AuthDeps) {
+  // Mounted at "/", so a pathless `.use` would cap every route's body; the limit goes on each route instead.
   return new Hono<AppEnv>()
-    .use(limitBody(LIMITS.jsonBody))
-    .post("/v1/auth/challenge", async (c) => {
+    .post("/v1/auth/challenge", limitBody(LIMITS.jsonBody), async (c) => {
       const body = await readJson(c, challengeSchema);
       const state = await group.claimed();
       await meta.purgeExpired(now());
@@ -50,7 +50,7 @@ export function authRoutes({ group, meta, now }: AuthDeps) {
         time: now(),
       });
     })
-    .post("/v1/auth/token", async (c) => {
+    .post("/v1/auth/token", limitBody(LIMITS.jsonBody), async (c) => {
       const body = await readJson(c, tokenSchema);
       const state = await group.claimed();
       const instance = await group.instance();

@@ -46,6 +46,17 @@ describe("objects", () => {
     expect((await changes(h, h.token, Number(listed.cursor))).objects).toEqual([]);
   });
 
+  test("objects larger than a JSON body are stored", async () => {
+    const h = await setup();
+    const bytes = h.object(1, {
+      content: toHex(randomBytes(50_000)).repeat(2) + toHex(randomBytes(50_000)),
+    });
+    expect(bytes.length).toBeGreaterThan(64 * 1024);
+    expect((await h.app.request(objectUrl(h.device, 1), putBytes(h.token, bytes))).status).toBe(
+      201,
+    );
+  });
+
   test("objects must match their path, sender, epoch and signature", async () => {
     const h = await setup();
     const url = objectUrl(h.device, 1);
