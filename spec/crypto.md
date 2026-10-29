@@ -63,18 +63,20 @@ Hash(label, data) = SHA-256("FLOW-SYNC/2 " ‖ label ‖ 0x00 ‖ data)
 
 ### Device keys
 
-Each device generates, once per installation:
+Device keys belong to one membership of one group. A device generates fresh ones when it creates a group, joins one (by pairing, including with the admin token) and restores one with the recovery key:
 
 - `sig`: an Ed25519 key pair (32-byte seed);
 - `kem`: an X25519 key pair (32-byte private key).
 
 Its device id is `did = Hash("device", sig_pub ‖ kem_pub)[0..16]`.
 
+A device deletes its device keys, with the group's epoch keys, after it [leaves](protocol.md#leaving) or learns it was [removed](protocol.md#removal). A device that joins again therefore has a new `did`, which the roster accepts because it has never seen it, and starts a new log.
+
 Private keys never leave the device. They are stored encrypted by a platform key: on Android with the existing Keystore AES-GCM helper, on Desktop in the OS keychain.
 
 ### Epoch keys
 
-The group key of epoch `e` is `K_e`, 32 bytes from the CSPRNG. Epochs are numbered from 0 at genesis. A new epoch starts when a device is removed, when the group is restored with the recovery key, and when the recovery key changes ([protocol.md](protocol.md)).
+The group key of epoch `e` is `K_e`, 32 bytes from the CSPRNG. Epochs are numbered from 0 at genesis. A new epoch starts when a device is removed, when a device rotates after another one left, when the group is restored with the recovery key, and when the recovery key changes ([protocol.md](protocol.md)).
 
 ```
 kc_e   = Derive(K_e, group, "epoch", u32(e), 32)          epoch commitment, in the signed roster entry

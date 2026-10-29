@@ -38,6 +38,26 @@ export function epochDraft(
   };
 }
 
+export function leaveDraft(leaving: MemberKeys): EntryDraft {
+  const did = toHex(leaving.did);
+  return { op: "leave", signer: did, remove: [did] };
+}
+
+/** Starts epoch `n` for exactly the current `members`. */
+export function rotateDraft(
+  signer: MemberKeys,
+  epochKey: Uint8Array,
+  group: Uint8Array,
+  n: number,
+  members: MemberKeys[],
+): EntryDraft {
+  return {
+    op: "rotate",
+    signer: toHex(signer.did),
+    epoch: epochDraft(epochKey, group, n, members),
+  };
+}
+
 /** Builds the next entry after `previous` (the roster head) and signs it with every signer. */
 export function buildEntry(
   group: Uint8Array,

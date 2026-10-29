@@ -31,7 +31,7 @@ const entrySchema = z.strictObject({
   group: hex(16),
   seq: z.int().min(0),
   prev: hex(32),
-  op: z.enum(["genesis", "add", "remove", "rename", "restore", "recovery"]),
+  op: z.enum(["genesis", "add", "remove", "leave", "rotate", "rename", "restore", "recovery"]),
   signer: did,
   add: z.array(subjectSchema).min(1).optional(),
   remove: z.array(did).min(1).optional(),
@@ -58,6 +58,8 @@ export interface RosterState {
   head: string;
   epoch: number;
   kc: string;
+  /** A device left during this epoch, so the next device to write must append a rotate first. */
+  rotate: boolean;
   members: ReadonlyMap<string, Member>;
   seen: ReadonlySet<string>;
 }
@@ -94,6 +96,8 @@ const OPS: Record<Op, { add: number | "none"; remove: boolean; epoch: boolean }>
   genesis: { add: 2, remove: false, epoch: true },
   add: { add: 1, remove: false, epoch: false },
   remove: { add: "none", remove: true, epoch: true },
+  leave: { add: "none", remove: true, epoch: false },
+  rotate: { add: "none", remove: false, epoch: true },
   rename: { add: "none", remove: false, epoch: false },
   restore: { add: 1, remove: false, epoch: true },
   recovery: { add: 1, remove: true, epoch: true },
@@ -168,8 +172,13 @@ export function applyEntry(state: RosterState | undefined, entry: Entry): Roster
   for (const id of entry.remove ?? []) {
     const member = members.get(id);
     const wanted = entry.op === "recovery" ? "recovery" : "device";
-    if (!member || member.role !== wanted || id === entry.signer) fail("roster-op");
+    if (!member || member.role !== wanted || (id === entry.signer) !== (entry.op === "leave")) {
+      fail("roster-op");
+    }
     members.delete(id);
+  }
+  if (entry.op === "leave" && ![...members.values()].some((m) => m.role === "device")) {
+    fail("roster-op");
   }
   if (entry.op === "restore") members.set(entry.signer, { ...signer, used: true });
   for (const [id, member] of added) {
@@ -202,6 +211,7 @@ export function applyEntry(state: RosterState | undefined, entry: Entry): Roster
     head: toHex(entryHash(entry)),
     epoch,
     kc: entry.epoch?.kc ?? (state?.kc as string),
+    rotate: entry.op === "leave" || (!entry.epoch && (state?.rotate ?? false)),
     members,
     seen,
   };
@@ -216,11 +226,13 @@ export function replayRoster(entries: Entry[]): RosterState {
 
 const RANK: Record<Op, number> = {
   remove: 0,
-  recovery: 1,
-  restore: 2,
-  add: 3,
-  rename: 4,
-  genesis: 5,
+  leave: 1,
+  recovery: 2,
+  restore: 3,
+  rotate: 4,
+  add: 5,
+  rename: 6,
+  genesis: 7,
 };
 
 /** Picks the winner among valid entries competing for the same seq on a store without ordering. */

@@ -22,6 +22,7 @@ function view(state: RosterState) {
     seq: state.seq,
     head: state.head,
     epoch: state.epoch,
+    rotate: state.rotate,
     members: [...state.members.entries()]
       .sort(([a], [b]) => (a < b ? -1 : 1))
       .map(([did, m]) => ({ did, role: m.role, used: m.used })),

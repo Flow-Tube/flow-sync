@@ -6,6 +6,7 @@ import {
   epochDraft,
   fromB64,
   fromHex,
+  leaveDraft,
   type MemberSecrets,
   memberId,
   memberSecrets,
@@ -13,6 +14,7 @@ import {
   openDeviceMeta,
   type RosterState,
   replayRoster,
+  rotateDraft,
   type Subject,
   sealDeviceMeta,
   signEntry,
@@ -27,6 +29,8 @@ const did = (m: MemberSecrets) => hex(m.did);
 const subject = memberSubject;
 const epochKey = (n: number) => epochKeys[n] as Uint8Array;
 const epoch = (n: number, members: MemberSecrets[]) => epochDraft(epochKey(n), group, n, members);
+const rotate = (signer: MemberSecrets, n: number, members: MemberSecrets[]) =>
+  rotateDraft(signer, epochKey(n), group, n, members);
 
 function meta(seq: number, m: MemberSecrets, epoch: number, name: string, platform: string) {
   const content = { app: `app-${name.toLowerCase()}`, name, platform };
@@ -41,12 +45,16 @@ function meta(seq: number, m: MemberSecrets, epoch: number, name: string, platfo
   );
 }
 
+type Chain = [Entry, Entry, Entry, Entry, Entry, Entry, Entry, Entry, Entry];
+
+const lowestHash = (entries: Entry[]) => entries.map((e) => hex(entryHash(e))).sort()[0];
+
 function entry(previous: Entry | undefined, draft: EntryDraft, signers: MemberSecrets[]): Entry {
   const head = previous && { seq: previous.seq, head: hex(entryHash(previous)) };
   return buildEntry(group, head, draft, signers);
 }
 
-function chain(): Entry[] {
+function chain(): Chain {
   const e0 = entry(
     undefined,
     {
@@ -100,7 +108,19 @@ function chain(): Entry[] {
     },
     [C, R2],
   );
-  return [e0, e1, e2, e3, e4, e5];
+  const e6 = entry(
+    e5,
+    {
+      op: "add",
+      signer: did(C),
+      add: [subject(D, "device")],
+      meta: { [did(D)]: meta(6, D, 3, "Tablet", "android") },
+    },
+    [C, D],
+  );
+  const e7 = entry(e6, leaveDraft(D), [D]);
+  const e8 = entry(e7, rotate(A, 4, [A, C, R2]), [A]);
+  return [e0, e1, e2, e3, e4, e5, e6, e7, e8];
 }
 
 function stateView(state: RosterState) {
@@ -108,14 +128,15 @@ function stateView(state: RosterState) {
     seq: state.seq,
     head: state.head,
     epoch: state.epoch,
+    rotate: state.rotate,
     members: [...state.members.entries()]
       .sort(([a], [b]) => (a < b ? -1 : 1))
       .map(([id, m]) => ({ did: id, role: m.role, used: m.used })),
   };
 }
 
-function negatives(entries: Entry[]) {
-  const [e0, e1, e2, e3, e4] = entries as [Entry, Entry, Entry, Entry, Entry];
+function negatives(entries: Chain) {
+  const [e0, e1, e2, e3, e4, , e6, e7] = entries;
   const weakKey = fromHex("0100000000000000000000000000000000000000000000000000000000000000");
   const weak: Subject = {
     did: hex(memberId(weakKey, C.kemPublic)),
@@ -217,11 +238,65 @@ function negatives(entries: Entry[]) {
       ),
       error: "roster-signer",
     },
+    {
+      name: "leave-by-non-member",
+      base: 7,
+      entry: entry(e6, leaveDraft(B), [B]),
+      error: "roster-signer",
+    },
+    {
+      name: "leave-removing-another",
+      base: 7,
+      entry: entry(e6, { op: "leave", signer: did(D), remove: [did(C)] }, [D]),
+      error: "roster-op",
+    },
+    {
+      name: "leave-with-others",
+      base: 7,
+      entry: entry(e6, { op: "leave", signer: did(D), remove: [did(C), did(D)] }, [D]),
+      error: "roster-op",
+    },
+    {
+      name: "leave-with-epoch",
+      base: 7,
+      entry: entry(e6, { ...leaveDraft(D), epoch: epoch(4, [A, C, R2]) }, [D]),
+      error: "roster-op",
+    },
+    {
+      name: "leave-by-recovery",
+      base: 7,
+      entry: entry(e6, leaveDraft(R2), [R2]),
+      error: "roster-signer",
+    },
+    {
+      name: "leave-last-device",
+      base: 4,
+      entry: entry(e3, leaveDraft(A), [A]),
+      error: "roster-op",
+    },
+    {
+      name: "rotate-without-epoch",
+      base: 8,
+      entry: entry(e7, { op: "rotate", signer: did(A) }, [A]),
+      error: "roster-op",
+    },
+    {
+      name: "rotate-with-remove",
+      base: 8,
+      entry: entry(e7, { ...rotate(A, 4, [A, R2]), remove: [did(C)] }, [A]),
+      error: "roster-op",
+    },
+    {
+      name: "rotate-to-departed",
+      base: 8,
+      entry: entry(e7, rotate(A, 4, [A, C, D, R2]), [A]),
+      error: "roster-epoch",
+    },
   ];
 }
 
-function forks(entries: Entry[]) {
-  const [, e1] = entries as [Entry, Entry];
+function forks(entries: Chain) {
+  const [, e1, , , , , e6, e7] = entries;
   const candidates = [
     entry(e1, { op: "add", signer: did(A), add: [subject(C, "device")] }, [A, C]),
     entry(e1, { op: "remove", signer: did(A), remove: [did(B)], epoch: epoch(1, [A, R1]) }, [A]),
@@ -237,13 +312,21 @@ function forks(entries: Entry[]) {
     ),
   ];
   const [add, remove, renameA, renameB] = candidates as [Entry, Entry, Entry, Entry];
-  const lowest = [renameA, renameB].sort((a, b) =>
-    hex(entryHash(a)) < hex(entryHash(b)) ? -1 : 1,
-  )[0] as Entry;
+  const leave = entry(e6, leaveDraft(D), [D]);
+  const rotateA = entry(e6, rotate(A, 4, [A, C, D, R2]), [A]);
+  const removeD = entry(
+    e6,
+    { op: "remove", signer: did(C), remove: [did(D)], epoch: epoch(4, [A, C, R2]) },
+    [C],
+  );
+  const rotates = [A, C].map((m) => entry(e7, rotate(m, 4, [A, C, R2]), [m]));
   return [
     { base: 2, candidates: [add, remove, renameA], winner: hex(entryHash(remove)) },
     { base: 2, candidates: [renameA, add], winner: hex(entryHash(add)) },
-    { base: 2, candidates: [renameA, renameB], winner: hex(entryHash(lowest)) },
+    { base: 2, candidates: [renameA, renameB], winner: lowestHash([renameA, renameB]) },
+    { base: 7, candidates: [rotateA, leave, removeD], winner: hex(entryHash(removeD)) },
+    { base: 7, candidates: [rotateA, leave], winner: hex(entryHash(leave)) },
+    { base: 8, candidates: rotates, winner: lowestHash(rotates) },
   ];
 }
 
