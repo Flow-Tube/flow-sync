@@ -73,6 +73,13 @@ export class LiveHub {
     for (const other of this.#connections) if (other.did !== from.did) other.socket.send(copy);
   }
 
+  /** Tells the group's other connected devices that [did] stored something new, so they sync now. */
+  changed(did: string): void {
+    const message = JSON.stringify({ type: "changed" });
+    for (const connection of this.#connections)
+      if (connection.did !== did) connection.socket.send(message);
+  }
+
   /** Closes connections whose token expired or whose device was removed. */
   async sweep(): Promise<void> {
     const state = await this.#group.roster();

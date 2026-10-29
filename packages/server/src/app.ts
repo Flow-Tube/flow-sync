@@ -58,16 +58,17 @@ export function createApp(deps: AppDeps) {
   const group = new Group(deps.storage.meta);
   app.route("/", metaRoutes(deps.config, group));
   const members = { group, meta: deps.storage.meta, now: deps.now, guards };
+  const hub = new LiveHub(group, deps.now);
+  const stored = (did: string) => hub.changed(did);
   app.route("/", claimRoutes(deps.config, group, guards));
   app.route("/", adminRoutes(deps.config, group, deps.storage.meta, guards));
   app.route("/", authRoutes(members));
-  app.route("/", rosterRoutes(members));
+  app.route("/", rosterRoutes({ ...members, stored }));
   app.route("/", keyRoutes(members));
-  app.route("/", objectRoutes({ ...members, blobs: deps.storage.blobs }, deps.config));
+  app.route("/", objectRoutes({ ...members, blobs: deps.storage.blobs, stored }, deps.config));
   app.route("/", pairRoutes(members));
   app.route("/", joinRoutes(members, deps.config, guards));
   app.route("/", statusRoutes(members, deps.config));
-  const hub = new LiveHub(group, deps.now);
   if (deps.upgradeWebSocket) app.route("/", liveRoutes(members, hub, deps.upgradeWebSocket));
   return { app, hub };
 }

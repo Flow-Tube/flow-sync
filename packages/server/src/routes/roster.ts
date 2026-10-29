@@ -14,7 +14,7 @@ const appendSchema = z.strictObject({
 });
 const afterSchema = z.coerce.number().int().min(-1).default(-1);
 
-export function rosterRoutes(deps: AuthDeps) {
+export function rosterRoutes(deps: AuthDeps & { stored: (did: string) => void }) {
   const member = requireMember(deps, { allowRecovery: true });
   return new Hono<AppEnv>()
     .get("/v1/roster", member, async (c) => {
@@ -29,6 +29,7 @@ export function rosterRoutes(deps: AuthDeps) {
         throw new HttpError("conflict", { head: state.head });
       }
       await deps.group.append(parseEntry(body.entry), body.wraps, body.chain);
+      deps.stored(c.get("did"));
       return c.body(null, 201);
     });
 }
