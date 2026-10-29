@@ -95,6 +95,11 @@ The scanner first sends its ephemeral X25519 public key (32 bytes) in the clear,
 - **LAN:** the scanner tries the `l` addresses in order, each with a 3-second connect timeout, and opens a WebSocket to `ws://<a>:<p>/flow-sync/2/pair`. Its first binary frame is the key; every later frame, in both directions, is one message. The shower serves one scanner at a time, and drops a connection as soon as a box from it fails to open.
 - **Mailbox:** the key is the prefix of the scanner's first message.
 
+The scanner first sends its ephemeral X25519 public key (32 bytes) in the clear, because the shower needs it to derive the keys:
+
+- **LAN:** the scanner tries the `l` addresses in order, each with a 3-second connect timeout, and opens a WebSocket to `ws://<a>:<p>/flow-sync/2/pair`. Its first binary frame is the key; every later frame, in both directions, is one message. The shower serves one scanner at a time, and drops a connection as soon as a box from it fails to open.
+- **Mailbox:** the key is the prefix of the scanner's first message.
+
 The shower keeps the slot open for 180 seconds and then closes it, as in FLOW-SYNC/1. Neither side compares clocks.
 
 ### Messages
@@ -134,6 +139,7 @@ To restore onto a new device, the user enters the words and the store location (
 2. Unwraps the latest `K_e` from the recovery member's wrap and checks `kc`.
 3. Creates its own device keys, writes wraps of `K_(e+1)`, and appends a `restore` entry signed by the recovery key.
 4. Immediately creates a new recovery key, appends a `recovery` entry, and shows the new words.
+5. Reads every log, then links its profile like a `welcome` would: to the link that change batches and snapshot manifests name for profile data, or to its own profile id when they name none. It writes no batch before that. While profiles can't choose their links, a group has one; with several, the user picks.
 
 Every other device shows that the group was restored with the recovery key, and when.
 
