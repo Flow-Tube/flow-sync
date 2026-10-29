@@ -52,7 +52,10 @@ function checkObject(state: RosterState, target: DevicePath, bytes: Uint8Array, 
   verifyObject(object, sender.sig);
 }
 
-export function objectRoutes(deps: AuthDeps & { blobs: BlobStore }, config: Config) {
+export function objectRoutes(
+  deps: AuthDeps & { blobs: BlobStore; stored: (did: string) => void },
+  config: Config,
+) {
   const { meta, blobs, group } = deps;
   const member = requireMember(deps);
   return new Hono<AppEnv>()
@@ -79,6 +82,7 @@ export function objectRoutes(deps: AuthDeps & { blobs: BlobStore }, config: Conf
         if (!(await meta.isHashUsed(hash))) await blobs.delete(hash);
         throw new HttpError("conflict");
       }
+      if (result === "created") deps.stored(target.did);
       return c.body(null, result === "created" ? 201 : 200);
     })
     .get(`${PREFIX}*`, member, async (c) => {

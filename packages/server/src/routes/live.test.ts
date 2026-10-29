@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import { claimedApp } from "../testing/app.ts";
 import { signIn } from "../testing/group.ts";
 import { closeServers, connect, serveLive } from "../testing/live.ts";
-import { sealedObject } from "../testing/objects.ts";
+import { objectUrl, putBytes, sealedObject } from "../testing/objects.ts";
 import { addDevice, append, removal } from "../testing/roster.ts";
 
 afterEach(closeServers);
@@ -37,6 +37,20 @@ describe("live relay", () => {
     const reply = h.live(h.joining);
     b.socket.send(reply);
     expect(await a.next()).toEqual(reply);
+  });
+
+  test("a stored object tells the other devices to sync", async () => {
+    const h = await setup();
+    const a = await connect(h.port, h.tokenA);
+    await a.next();
+    const b = await connect(h.port, h.tokenB);
+    await a.next();
+    await b.next();
+    const bytes = sealedObject(h.joining, 1, { group: h.group, epochKey: h.epochKey });
+    expect((await h.app.request(objectUrl(h.joining, 1), putBytes(h.tokenB, bytes))).status).toBe(
+      201,
+    );
+    expect(await a.next()).toBe(JSON.stringify({ type: "changed" }));
   });
 
   test("a connection needs a valid token", async () => {
