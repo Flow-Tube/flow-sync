@@ -189,7 +189,7 @@ A device SHOULD write a snapshot for a link when it has merged more than 1 MiB o
 
 ### Acknowledgements
 
-After applying, a device appends an ack: `{"vv":{"<did>":seq}}`, the last `seq` of every other sender it has consumed. A batch skipped on purpose (an unselected link) counts as consumed. A device has always read its own log, so its acks leave itself out.
+After applying, a device appends an ack: `{"vv":{"<did>":seq}}`, the last `seq` of every other sender it has consumed. A batch skipped on purpose (an unselected link) counts as consumed. A device has always read its own log, so its acks leave itself out. Acks aren't acknowledged: a device writes one only after consuming batches or snapshot manifests, and its next ack covers any acks it read before.
 
 ### Garbage collection
 
