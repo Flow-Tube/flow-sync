@@ -65,18 +65,33 @@ Later frames are `u64(seq) ‖ Box(K, "FLOW-SYNC/2 lan" ‖ u64(seq), payload)`,
 
 ### Requests
 
-Each request and response is a payload whose content is a JSON header line, then `\n`, then raw bytes when the operation carries an object:
+After message 3, either device may send requests at any time, and answers may come in any order. The payload of each frame is a canonical JSON header line, then `\n` and raw bytes when the operation carries them:
 
-| `op` | Request | Response |
-|---|---|---|
-| `roster` | `after` | Entries after that `seq` |
-| `key` | `epoch`, `did` | The wrap, or the chain box when `did` is `chain` |
-| `list` | `vv`: `{did: seq}` | Paths of log objects above `vv` that the peer holds, and blob names they reference |
-| `get` | `path` | The object |
-| `put` | `path`, then the object | `ok` |
-| `live` | the live envelope | none |
+- A request header has `id` (counting from 0 for each sender) and `op`, plus the fields below.
+- A response header has `re` (the request's `id`) and `ok`. When `ok` is false it has `error`: `not_found`, `invalid` or `refused`.
 
-A peer serves the objects it holds, its own and the ones it has fetched, and accepts any object that verifies ([store.md](store.md#reading-an-envelope)). LAN-only groups therefore converge through any device that meets the others.
+| `op` | Request fields | Response fields | Bytes |
+|---|---|---|---|
+| `roster` | `after` | `entries`: every roster entry the peer holds with a `seq` above `after`, fork candidates included | none |
+| `key` | `epoch`, `name` (a member's `did` or `chain`) | none | the wrap or the chain box |
+| `list` | `vv`: `{did: seq}` | `paths`: the log objects the peer holds above `vv`; `blobs`: the blob paths their snapshot manifests name | none |
+| `get` | `path` | none | the object or blob |
+| `put` | `path` | none | in the request: the object |
+| `live` | none | no response | in the request: the live envelope |
+
+A frame holds at most 4 MiB of payload. A peer serves what it holds, its own objects and the ones it has fetched. It accepts a `put` only of an object that passes steps 1 to 3 of [reading an envelope](store.md#reading-an-envelope), at the path that object belongs at.
+
+### LAN groups
+
+A group can live on its devices alone, with no store: its location is `{"k":"lan"}`.
+
+- **Creating.** A device writes the genesis entry and its wraps locally. Nothing is claimed.
+- **Holding.** Every device keeps every roster entry it has seen (fork candidates under their [store names](store.md#layout)), every wrap and chain box, and every log object and blob it has fetched, and serves them with the requests above.
+- **Appending.** A device writes the wraps and then the entry locally; the entry spreads as other devices pull `roster`. Concurrent entries resolve by the [fork rule](protocol.md#forks).
+- **Pairing.** Pairing always runs over the LAN. The member's `welcome` carries `{"k":"lan"}`. After `done`, the new device opens a LAN session to the address the pairing used, pulls the roster from genesis, its wrap, and the objects of every log.
+- **Syncing.** When two members meet, through mDNS or the address of a recent session, each one pulls from the other: `roster` after its head, the wraps and chain boxes it lacks, then `list` with its version vector and `get` for what it lacks. It merges what it read as from any store, and writes its own objects locally only.
+
+Groups on a store sync the same way when their devices meet, as well as through the store.
 
 ### Platform notes
 
