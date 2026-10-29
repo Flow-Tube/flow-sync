@@ -16,7 +16,7 @@ An entry is a canonical JSON object:
 | `group` | hex | always | The 16-byte group id |
 | `seq` | int | always | 0 for genesis, then +1 per entry |
 | `prev` | hex | always | SHA-256 of the previous entry; 32 zero bytes for genesis |
-| `op` | string | always | `genesis`, `add`, `remove`, `rename`, `restore` or `recovery` |
+| `op` | string | always | `genesis`, `add`, `remove`, `leave`, `rotate`, `rename`, `restore` or `recovery` |
 | `signer` | hex | always | The signing member's `did` |
 | `add` | array | when adding | Subjects `{"did", "sig", "kem", "role"}`, sorted by `did`; `sig` and `kem` are b64 public keys; `role` is `device` or `recovery` |
 | `remove` | array | when removing | Hex `did`s, sorted |
@@ -32,7 +32,7 @@ Absent fields are omitted, never `null` or empty.
 
 ### Validation
 
-A device keeps the roster state: the last `seq` and hash, the current epoch `n` and `kc`, and the members (`did`, keys, role, and for the recovery member whether it has been used). An entry is valid against that state when all of these hold:
+A device keeps the roster state: the last `seq` and hash, the current epoch `n` and `kc`, and the members (`did`, keys, role, and for the recovery member whether it has been used), and whether a device has left since the current epoch started, so a `rotate` is due. An entry is valid against that state when all of these hold:
 
 1. `v` is 2, `group` matches, `seq` is the last `seq` + 1, and `prev` is the last hash. Genesis has `seq` 0 on an empty state.
 2. `signer` is a current member, and `sigs[signer]` verifies under its key.
@@ -44,6 +44,8 @@ A device keeps the roster state: the last `seq` and hash, the current epoch `n` 
 | `genesis` | the device in `add` | `add`: one `device`, one `recovery`; `epoch` with `n` 0 | `remove` | Creates the group |
 | `add` | a device | `add`: one `device` | `remove`, `epoch` | Adds a device |
 | `remove` | a device | `remove`: one or more devices, not the signer; `epoch` | `add` | Removes devices and starts an epoch |
+| `leave` | a device, not the last one | `remove`: exactly the signer | `add`, `epoch` | The signer stops being a member ([Leaving](#leaving)) |
+| `rotate` | a device | `epoch` | `add`, `remove` | Starts an epoch for the current members |
 | `rename` | a device | `meta` for exactly one current device | `add`, `remove`, `epoch` | Changes a name |
 | `restore` | the recovery member, not used yet | `add`: one `device`; `epoch` | `remove` | Adds a device, starts an epoch, marks the recovery member used |
 | `recovery` | a device | `remove`: the current recovery member; `add`: one `recovery`; `epoch` | | Replaces the recovery key and starts an epoch |
@@ -60,7 +62,7 @@ The Flow server appends linearly: an append names the current head and fails if 
 WebDAV, S3 and LAN peers can't do that, so two devices may append at the same `seq`. Entries are stored under names that include their hash, so both survive, and every device picks the same winner:
 
 1. Only entries valid against the state before them count.
-2. Lowest rank wins: `remove` 0, `recovery` 1, `restore` 2, `add` 3, `rename` 4. Removal wins so a revoked device can't win with a concurrent entry.
+2. Lowest rank wins: `remove` 0, `leave` 1, `recovery` 2, `restore` 3, `rotate` 4, `add` 5, `rename` 6. Removal wins so a revoked device can't win with a concurrent entry. `leave` comes next, so an entry that starts an epoch at the same `seq` is re-applied on top of it and leaves the departed device out. `rotate` comes after the other entries that start an epoch, because any of them makes it unnecessary.
 3. For equal rank, the lowest entry hash (as bytes) wins.
 
 Losing entries, and everything built on them, are ignored. A device whose entry lost re-applies its change on top of the winner.
@@ -113,7 +115,7 @@ Each message is canonical JSON with a `type`, carried as a payload in a box.
 
 | # | From | `type` | Content |
 |---|---|---|---|
-| 1 | N | `join` | N's `sig` and `kem` public keys and its `meta` content |
+| 1 | N | `join` | N's `sig` and `kem` public keys, fresh for this group ([crypto.md](crypto.md#device-keys)), and its `meta` content |
 | | both | | Both devices show the SAS. Each user confirms on their device. A device that hasn't confirmed sends nothing more. |
 | 2 | M | `entry` | The `add` entry for N, signed by M except for `sigs[N]` |
 | 3 | N | `accept` | N's signature over that entry |
@@ -145,6 +147,19 @@ Any remaining device can remove one or more devices, including one that is lost:
 
 Old objects are not re-encrypted: the removed device already had them. They leave through garbage collection.
 
+A device that finds itself missing from a roster it has verified deletes its device keys and the group's epoch keys, and stops syncing. On a Flow server it can no longer read the roster: once the server refuses it a token, it stops syncing and tells the user, who can forget the group, which deletes the same keys.
+
+## Leaving
+
+A device can't sign its own `remove`, and must never hold the key of the epoch that shuts it out. So it leaves with an entry that changes no keys, and the devices that stay start the next epoch:
+
+1. The leaving device appends a `leave` entry signed by itself, with only its own `did` in `remove`. The last device of a group can't leave; it can only forget the group.
+2. The server revokes its tokens on that append. The device then deletes its device keys, the group's epoch keys and everything it stored for the group. On WebDAV and S3, the user should also revoke its credentials if it had its own.
+3. A device that sees a `leave` not yet followed by an entry that starts an epoch appends a `rotate` before it writes any new object: it generates `K_(e+1)`, writes a wrap for each current member, including the recovery member, and the history chain box, and appends `rotate` with `epoch` `n = e + 1`. Devices that rotate at the same time make a fork, resolved as above; a device whose `rotate` lost adopts the winner's epoch and doesn't rotate again.
+4. The device that rotated writes a new snapshot under `e + 1` for each link soon after, as after a removal.
+
+From its `leave` on, the device counts as removed everywhere in this document: its acks no longer hold back garbage collection, and any current device may delete its objects. To join again it pairs with new device keys, so it gets a new `did` and a new log.
+
 ## Recovery
 
 Setup shows the recovery key once, as 24 words and a QR code, and asks for two of the words back before it counts the key as saved. Until then, Linked devices shows that the key isn't confirmed.
@@ -153,7 +168,7 @@ To restore onto a new device, the user enters the words and the store location (
 
 1. Derives the recovery keys and reads and verifies the roster.
 2. Unwraps the latest `K_e` from the recovery member's wrap and checks `kc`.
-3. Creates its own device keys, writes wraps of `K_(e+1)`, and appends a `restore` entry signed by the recovery key.
+3. Creates fresh device keys, writes wraps of `K_(e+1)`, and appends a `restore` entry signed by the recovery key.
 4. Immediately creates a new recovery key, appends a `recovery` entry, and shows the new words.
 5. Reads every log, then links its profile like a `welcome` would: to the link that change batches and snapshot manifests name for profile data, or to its own profile id when they name none. It writes no batch before that. While profiles can't choose their links, a group has one; with several, the user picks.
 
@@ -214,7 +229,7 @@ A snapshot holds the merged state of one link (or of `profiles`) as blobs, plus 
 
 `vv` is the version vector the state includes: for each sender, the last `seq` merged and the SHA-256 of that object. Merges are state-based, so any device's snapshot is valid, and a new device can start from any snapshot and then read each log after `vv`. The first object it reads from sender X must have `seq` = `vv[X].seq` + 1 and `prev` = `vv[X].hash`, so the chain still holds once older objects are deleted.
 
-A device SHOULD write a snapshot for a link when it has merged more than 1 MiB of batches since the last snapshot of that link, when the last one is 7 days old, and after starting an epoch with `remove`.
+A device SHOULD write a snapshot for a link when it has merged more than 1 MiB of batches since the last snapshot of that link, when the last one is 7 days old, and after starting an epoch with `remove` or `rotate`.
 
 ### Acknowledgements
 

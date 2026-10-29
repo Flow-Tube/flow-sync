@@ -37,7 +37,7 @@ POST /v1/auth/token       {"did":"<hex>","challenge":"<b64>","sig":"<b64>"}
 
 - `sig` signs `"FLOW-SYNC/2 auth" ‖ instance ‖ group ‖ challenge` with the device's roster key. Devices pin `instance` when they pair (it is part of the store settings in `welcome`) and refuse any other value, so a malicious server can't relay a challenge from another instance.
 - A challenge is single-use and expires after 60 seconds.
-- A token lasts at most 15 minutes and is bound to the `did`. Every request re-checks that the `did` is still a current device, so removal takes effect at once.
+- A token lasts at most 15 minutes and is bound to the `did`. Every request re-checks that the `did` is still a current device, so removal and leaving take effect at once.
 - `time` lets a device notice clock drift; no protocol step depends on it.
 - `group` lets a device restoring from the recovery key, which knows only the server, sign in. The group id isn't secret: every object header carries it.
 - Requests send `Authorization: Bearer <token>`.
@@ -82,7 +82,7 @@ The operator sets `FLOW_SYNC_ADMIN_TOKEN`, or `FLOW_SYNC_ADMIN_TOKEN_FILE` namin
 
 ### Roster appends
 
-The server validates an append with the reference roster rules ([protocol.md](protocol.md#validation)) and appends linearly: `If-Match` must name the current head. When the entry starts an epoch, the request MUST carry a wrap for every `did` in `epoch.to`, and `chain` for epochs above 0. An `add` entry MUST carry the new device's wrap of the current epoch. Any other entry carries no wraps. The entry, its wraps and its chain box are stored atomically. A `remove` entry revokes the removed devices' tokens in the same transaction.
+The server validates an append with the reference roster rules ([protocol.md](protocol.md#validation)) and appends linearly: `If-Match` must name the current head. When the entry starts an epoch, the request MUST carry a wrap for every `did` in `epoch.to`, and `chain` for epochs above 0. An `add` entry MUST carry the new device's wrap of the current epoch. Any other entry carries no wraps. The entry, its wraps and its chain box are stored atomically. A `remove` or `leave` entry revokes the tokens of the devices it removes in the same transaction.
 
 ### Objects
 

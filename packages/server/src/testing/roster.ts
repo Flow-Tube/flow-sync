@@ -5,6 +5,7 @@ import {
   memberSubject,
   randomBytes,
   replayRoster,
+  rotateDraft,
   sealChain,
   toB64,
   toHex,
@@ -41,10 +42,19 @@ export async function addDevice(h: Harness, token: string) {
   return { joining, res };
 }
 
-export async function removal(h: Harness, token: string, removed: string) {
-  const state = replayRoster(await entries(h, token));
+/** A new epoch for the device and the recovery member, with its wraps and chain box. */
+async function nextEpoch(h: Harness) {
   const key = randomBytes(32);
   const remaining = [h.device, h.recovery];
+  const wraps: Record<string, string> = {};
+  for (const m of remaining)
+    wraps[toHex(m.did)] = toB64(await wrapEpochKey(m.kemPublic, h.group, 1, m.did, key));
+  return { key, remaining, wraps, chain: toB64(sealChain(key, h.group, 1, h.epochKey)) };
+}
+
+export async function removal(h: Harness, token: string, removed: string) {
+  const state = replayRoster(await entries(h, token));
+  const { key, remaining, wraps, chain } = await nextEpoch(h);
   const entry = buildEntry(
     h.group,
     state,
@@ -56,8 +66,14 @@ export async function removal(h: Harness, token: string, removed: string) {
     },
     [h.device],
   );
-  const wraps: Record<string, string> = {};
-  for (const m of remaining)
-    wraps[toHex(m.did)] = toB64(await wrapEpochKey(m.kemPublic, h.group, 1, m.did, key));
-  return { entry, wraps, chain: toB64(sealChain(key, h.group, 1, h.epochKey)), head: state.head };
+  return { entry, wraps, chain, head: state.head };
+}
+
+export async function rotation(h: Harness, token: string) {
+  const state = replayRoster(await entries(h, token));
+  const { key, remaining, wraps, chain } = await nextEpoch(h);
+  const entry = buildEntry(h.group, state, rotateDraft(h.device, key, h.group, 1, remaining), [
+    h.device,
+  ]);
+  return { entry, wraps, chain, head: state.head };
 }

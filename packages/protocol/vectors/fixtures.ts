@@ -7,7 +7,7 @@ export function rand(label: string, length = 32): Uint8Array {
 
 export const hex = toHex;
 export const group = rand("group", 16);
-export const epochKeys = [0, 1, 2, 3].map((n) => rand(`epoch ${n}`));
+export const epochKeys = [0, 1, 2, 3, 4].map((n) => rand(`epoch ${n}`));
 export const device = {
   A: memberSecrets(rand("A sig"), rand("A kem")),
   B: memberSecrets(rand("B sig"), rand("B kem")),

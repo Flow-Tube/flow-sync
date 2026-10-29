@@ -1,8 +1,8 @@
-import { buildEntry, memberSubject, replayRoster, toHex } from "@flow-sync/protocol";
+import { buildEntry, leaveDraft, memberSubject, replayRoster, toHex } from "@flow-sync/protocol";
 import { describe, expect, test } from "vitest";
 import { bearer, claimedApp } from "../testing/app.ts";
 import { newDevice, signIn } from "../testing/group.ts";
-import { addDevice, append, entries, removal } from "../testing/roster.ts";
+import { addDevice, append, entries, removal, rotation } from "../testing/roster.ts";
 
 describe("roster", () => {
   test("members read the roster from any point", async () => {
@@ -101,5 +101,26 @@ describe("roster", () => {
     expect(res.status).toBe(201);
     expect((await h.app.request("/v1/status", bearer(removedToken))).status).toBe(401);
     expect((await h.app.request("/v1/roster", bearer(removedToken))).status).toBe(401);
+  });
+
+  test("a device that leaves is revoked at once, and the next epoch excludes it", async () => {
+    const h = await claimedApp();
+    const token = await signIn(h.app, h.device, h.group);
+    const { joining } = await addDevice(h, token);
+    const leavingToken = await signIn(h.app, joining, h.group);
+    const state = replayRoster(await entries(h, token));
+    const entry = buildEntry(h.group, state, leaveDraft(joining), [joining]);
+    expect((await append(h, leavingToken, { entry, wraps: {} }, state.head)).status).toBe(201);
+    expect((await h.app.request("/v1/status", bearer(leavingToken))).status).toBe(401);
+    expect(replayRoster(await entries(h, token)).rotate).toBe(true);
+    const rotate = await rotation(h, token);
+    const res = await append(
+      h,
+      token,
+      { entry: rotate.entry, wraps: rotate.wraps, chain: rotate.chain },
+      rotate.head,
+    );
+    expect(res.status).toBe(201);
+    expect(replayRoster(await entries(h, token)).rotate).toBe(false);
   });
 });

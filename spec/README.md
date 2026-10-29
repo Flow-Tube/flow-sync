@@ -8,7 +8,7 @@ FLOW-SYNC/2 links one person's Flow devices into a sync group. Devices exchange 
 |---|---|
 | [threat-model.md](threat-model.md) | Assets, adversaries, goals, the mechanism behind each goal, and its limits |
 | [crypto.md](crypto.md) | Primitives, labels, key schedule, sealing, padding, and why each was chosen |
-| [protocol.md](protocol.md) | Device identity, the roster, epochs, pairing, removal, recovery, sync rules |
+| [protocol.md](protocol.md) | Device identity, the roster, epochs, pairing, removal, leaving, recovery, sync rules |
 | [store.md](store.md) | The encrypted object envelope and the layout every backend shares |
 | [api.md](api.md) | The Flow server's HTTP API v1 and its limits |
 | [live.md](live.md) | The live channel (handoff, remote control, presence) and the LAN transport |
