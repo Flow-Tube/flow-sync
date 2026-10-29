@@ -2,6 +2,7 @@ import {
   agreementPublicKey,
   buildEntry,
   canonical,
+  concat,
   decodePayload,
   type Entry,
   encodePayload,
@@ -27,36 +28,50 @@ import type { SimDevice } from "./device.ts";
 
 type Message = Record<string, Json>;
 
+interface Keys {
+  send: Uint8Array;
+  receive: Uint8Array;
+}
+
 /** One side of the mailbox: seals what it sends, opens what the other side sent. */
-function mailbox(
-  device: SimDevice,
-  slot: string,
-  token: Uint8Array,
-  keys: { send: Uint8Array; receive: Uint8Array },
-  me: "a" | "b",
-) {
+function mailbox(device: SimDevice, slot: string, token: Uint8Array, me: "a" | "b") {
   const other = me === "a" ? "b" : "a";
+  let keys: Keys | undefined;
   let sent = 0;
   let received = 0;
+  const need = () => {
+    if (!keys) throw new Error("pairing keys not derived yet");
+    return keys;
+  };
   return {
-    async send(message: Message) {
+    useKeys(derived: Keys) {
+      keys = derived;
+    },
+    async send(message: Message, prefix: Uint8Array = new Uint8Array()) {
       const seq = sent++;
-      const box = seal(keys.send, pairingAad(token, seq), encodePayload(utf8(canonical(message))));
+      const sealed = seal(
+        need().send,
+        pairingAad(token, seq),
+        encodePayload(utf8(canonical(message))),
+      );
       const res = await device.fetch(`/v1/${pairPath(slot, me, seq)}`, {
         method: "PUT",
         headers: { "content-type": "application/octet-stream" },
-        body: box,
+        body: concat(prefix, sealed),
       });
       if (res.status !== 201) throw new Error(`mailbox put ${res.status}`);
     },
-    async receive(): Promise<Message> {
-      const seq = received++;
-      const res = await device.fetch(`/v1/${pairPath(slot, other, seq)}`);
+    async next(): Promise<Uint8Array> {
+      const res = await device.fetch(`/v1/${pairPath(slot, other, received)}`);
       if (!res.ok) throw new Error(`mailbox get ${res.status}`);
-      const box = new Uint8Array(await res.arrayBuffer());
-      return JSON.parse(
-        new TextDecoder().decode(decodePayload(open(keys.receive, pairingAad(token, seq), box))),
-      );
+      return new Uint8Array(await res.arrayBuffer());
+    },
+    open(sealed: Uint8Array): Message {
+      const payload = open(need().receive, pairingAad(token, received++), sealed);
+      return JSON.parse(new TextDecoder().decode(decodePayload(payload)));
+    },
+    async receive(): Promise<Message> {
+      return this.open(await this.next());
     },
   };
 }
@@ -65,31 +80,36 @@ function mailbox(
  * Runs pairing through the server mailbox, as protocol.md describes, with the member showing the
  * QR code. Returns the SAS each side would show, so the test can compare them like a user does.
  */
-export async function pairThroughMailbox(member: SimDevice, joining: SimDevice) {
+export async function pairThroughMailbox(member: SimDevice, joining: SimDevice, url: string) {
   const token = randomBytes(16);
   const showerSecret = randomBytes(32);
-  const scannerSecret = randomBytes(32);
   const showerPublic = agreementPublicKey(showerSecret);
-  const scannerPublic = agreementPublicKey(scannerSecret);
   const slot = toHex(pairingSlot(token));
   await member.json("/v1/pair", { slot });
+  const shower = mailbox(member, slot, token, "a");
+  const scanner = mailbox(joining, slot, token, "b");
 
-  const a = pairingKeys(showerSecret, scannerPublic, token, showerPublic, scannerPublic);
+  const scannerSecret = randomBytes(32);
+  const scannerPublic = agreementPublicKey(scannerSecret);
   const b = pairingKeys(scannerSecret, showerPublic, token, showerPublic, scannerPublic);
-  const shower = mailbox(member, slot, token, { send: a.showerKey, receive: a.scannerKey }, "a");
-  const scanner = mailbox(joining, slot, token, { send: b.scannerKey, receive: b.showerKey }, "b");
-
-  await scanner.send({
+  scanner.useKeys({ send: b.scannerKey, receive: b.showerKey });
+  const join = {
     type: "join",
     sig: toB64(joining.keys.sigPublic),
     kem: toB64(joining.keys.kemPublic),
     meta: { app: "app", name: "Desktop", platform: "linux" },
-  });
-  const join = await shower.receive();
+  };
+  await scanner.send(join, scannerPublic);
+
+  const first = await shower.next();
+  const theirPublic = first.subarray(0, 32);
+  const a = pairingKeys(showerSecret, theirPublic, token, showerPublic, theirPublic);
+  shower.useKeys({ send: a.showerKey, receive: a.scannerKey });
+  const joined = shower.open(first.subarray(32));
   const state = await member.syncRoster();
-  const kemPublic = fromB64(join.kem as string);
+  const kemPublic = fromB64(joined.kem as string);
   const subject = memberSubject(
-    { sigPublic: fromB64(join.sig as string), kemPublic, did: joining.keys.did },
+    { sigPublic: fromB64(joined.sig as string), kemPublic, did: joining.keys.did },
     "device",
   );
   const draft = buildEntry(member.group, state, { op: "add", signer: member.did, add: [subject] }, [
@@ -123,13 +143,15 @@ export async function pairThroughMailbox(member: SimDevice, joining: SimDevice) 
   await shower.send({
     type: "welcome",
     group: toHex(member.group),
-    instance: member.instance,
-    seq: head.seq,
     head: head.head,
+    seq: head.seq,
+    link: "default-link",
+    store: { k: "server", u: url, i: member.instance },
   });
 
   const welcome = await scanner.receive();
-  joining.instance = welcome.instance as string;
+  const store = welcome.store as Record<string, string>;
+  joining.instance = store.i as string;
   joining.group = fromHex(welcome.group as string);
   await joining.signIn();
   await joining.syncRoster({ seq: welcome.seq as number, head: welcome.head as string });
