@@ -196,23 +196,23 @@ Each device keeps its own map from local profile to link id, and which links it 
 A snapshot holds the merged state of one link (or of `profiles`) as blobs, plus a manifest in the writer's log:
 
 ```
-{"head":"<roster head>","link":"<link id>|null","parts":[{"blob":"<hex>","collection":"…","size":n}],"vv":{"<did>":seq}}
+{"head":"<roster head>","link":"<link id>|null","parts":[{"blob":"<hex>","collection":"…","size":n}],"vv":{"<did>":{"hash":"<hex>","seq":n}}}
 ```
 
-`vv` is the version vector the state includes: for each sender, the last `seq` merged. Merges are state-based, so any device's snapshot is valid, and a new device can start from any snapshot and then read each log after `vv`.
+`vv` is the version vector the state includes: for each sender, the last `seq` merged and the SHA-256 of that object. Merges are state-based, so any device's snapshot is valid, and a new device can start from any snapshot and then read each log after `vv`. The first object it reads from sender X must have `seq` = `vv[X].seq` + 1 and `prev` = `vv[X].hash`, so the chain still holds once older objects are deleted.
 
 A device SHOULD write a snapshot for a link when it has merged more than 1 MiB of batches since the last snapshot of that link, when the last one is 7 days old, and after starting an epoch with `remove`.
 
 ### Acknowledgements
 
-After applying, a device appends an ack: `{"vv":{"<did>":seq}}`, the last `seq` of every sender it has consumed. A batch skipped on purpose (an unselected link) counts as consumed.
+After applying, a device appends an ack: `{"vv":{"<did>":seq}}`, the last `seq` of every other sender it has consumed. A batch skipped on purpose (an unselected link) counts as consumed. A device has always read its own log, so its acks leave itself out. Acks aren't acknowledged: a device writes one only after consuming batches or snapshot manifests, and its next ack covers any acks it read before.
 
 ### Garbage collection
 
 An object of sender X at `seq` n MAY be deleted when:
 
-- every current device's latest ack has `vv[X] ≥ n`, and
-- for every link, and for `profiles`, a snapshot acked by every current device has `vv[X] ≥ n`.
+- every current device other than X has a latest ack with `vv[X] ≥ n`, and
+- for every link that batches name, and for `profiles` once a device writes it, a snapshot that every current device has acked has `vv[X].seq ≥ n`. A device has acked a snapshot when its latest ack covers the manifest's `seq` in its writer's log.
 
 A snapshot manifest and its blobs MAY be deleted when a newer snapshot of the same link has a version vector at least as large for every sender and every current device has acked it. Removed devices don't count.
 
