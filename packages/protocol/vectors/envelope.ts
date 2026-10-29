@@ -82,6 +82,7 @@ export function envelopeVectors(): Vectors {
     { name: "tampered-header", object: flip(first, 45), error: "signature" },
     { name: "replay", object: second, last: second, error: "replay" },
     { name: "gap", object: third, last: first, error: "gap" },
+    { name: "missing-start", object: second, error: "gap" },
     {
       name: "wrong-prev",
       object: resign(second, (h) => ({ ...h, prev: ZERO_HASH }), "salt 6"),

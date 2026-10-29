@@ -102,14 +102,18 @@ export interface StreamPosition {
   hash: Uint8Array;
 }
 
-/** Advances a sender's log stream; `last` is undefined for a sender never read before. */
-export function nextInStream(last: StreamPosition | undefined, object: ParsedObject) {
+const STREAM_START: StreamPosition = { seq: 0, hash: ZERO_HASH };
+
+/** Advances a sender's log stream; a sender never read before starts before `seq` 1. */
+export function nextInStream(
+  last: StreamPosition | undefined,
+  object: ParsedObject,
+): StreamPosition {
   const { seq, prev } = object.header;
-  if (last) {
-    if (seq <= last.seq) fail("replay");
-    if (seq > last.seq + 1) fail("gap");
-    if (!equalBytes(prev, last.hash)) fail("prev");
-  }
+  const from = last ?? STREAM_START;
+  if (seq <= from.seq) fail("replay");
+  if (seq > from.seq + 1) fail("gap");
+  if (!equalBytes(prev, from.hash)) fail("prev");
   return { seq, hash: object.hash };
 }
 
