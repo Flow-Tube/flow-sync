@@ -74,9 +74,9 @@ After message 3, either device may send requests at any time, and answers may co
 
 | `op` | Request fields | Response fields | Bytes |
 |---|---|---|---|
-| `roster` | `after` (the highest `seq` the asker holds, or -1) | `entries`: every roster entry the peer holds with a `seq` above `after`, fork candidates included | none |
+| `roster` | `after` (the `seq` of the asker's head, or -1) and `head` (its hash, absent with -1) | `entries`: every roster entry the peer holds with a `seq` above `after`, fork candidates included; every entry it holds when it has no entry with hash `head` | none |
 | `key` | `epoch`, `name` (a member's `did` or `chain`) | none | the wrap or the chain box |
-| `list` | `vv`: `{did: seq}`, for each log the last `seq` the asker holds with none missing before it | `paths`: the log objects the peer holds above `vv`; `blobs`: every blob path the peer holds | none |
+| `list` | `vv`: `{did: seq}`, for each log the last `seq` the asker holds with none missing between it and the oldest object it holds of that log | `paths`: the log objects the peer holds above `vv`; `blobs`: every blob path the peer holds | none |
 | `get` | `path` | none | the object or blob |
 | `put` | `path` | none | in the request: the object |
 | `live` | none | no response | in the request: the live envelope |
@@ -89,7 +89,7 @@ A group can live on its devices alone, with no store: its location is `{"k":"lan
 
 - **Creating.** A device writes the genesis entry and its wraps locally. Nothing is claimed.
 - **Holding.** Every device keeps every roster entry it has seen (fork candidates under their [store names](store.md#layout)), every wrap and chain box, and every log object and blob it has fetched, and serves them with the requests above.
-- **Appending.** A device writes the wraps and then the entry locally; the entry spreads as other devices pull `roster`. Concurrent entries resolve by the [fork rule](protocol.md#forks).
+- **Appending.** A device writes the wraps and then the entry locally; the entry spreads as other devices pull `roster`. Concurrent entries resolve by the [fork rule](protocol.md#forks): a peer that doesn't hold the asker's head answers `roster` with everything, so both see every candidate.
 - **Pairing.** Pairing always runs over the LAN. The member's `welcome` carries `{"k":"lan"}`, and also `entries` (every roster entry up to the head it names) and `wrap` (b64, the new device's wrap of the current epoch): the new device needs both before it can verify the roster or open a LAN session, which starts with `P_e,lan`. After `done`, the member waits up to 5 seconds for the scanner to close the pairing connection, then the devices sync as below.
 - **Syncing.** When two members meet, through mDNS or the address of a recent session, each one pulls from the other: `roster` after its head, the wraps and chain boxes it lacks, then `list` with its version vector and `get` for what it lacks. It merges what it read as from any store, and writes its own objects locally only.
 
