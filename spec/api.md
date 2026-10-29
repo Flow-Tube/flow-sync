@@ -69,6 +69,11 @@ The operator sets `FLOW_SYNC_ADMIN_TOKEN`, or `FLOW_SYNC_ADMIN_TOKEN_FILE` namin
 | `PUT /v1/pair/<slot>/<name>` | slot | box bytes | 201 |
 | `GET /v1/pair/<slot>/<name>` | slot | | box bytes, or 404 |
 | `DELETE /v1/pair/<slot>` | token | | 204 |
+| `POST /v1/join` | admin | `{"id":"<hex>","name":"…"}` | 201 `{"expires":<ms>}`, or 409 when the id exists or 3 requests are pending |
+| `GET /v1/join` | token | | `{"requests":[{"id","name","expires"}]}`: pending requests not answered yet |
+| `PUT /v1/join/<id>` | token | `{"code":"<QR code JSON>"}` | 201, 404 when unknown or expired, 409 when already answered |
+| `GET /v1/join/<id>` | admin | | `{"code":"…"}`, or 404 until a member answers |
+| `DELETE /v1/join/<id>` | token | | 204: a member declined |
 | `GET /v1/live` | token | WebSocket upgrade | see [live.md](live.md) |
 | `GET /v1/status` | token | | `{"used":bytes,"quota":bytes,"objects":n,"devices":{"<did>":{"seen":<ms>}}}` |
 | `GET /v1/admin/usage` | admin | | as status, plus roster size |

@@ -21,4 +21,7 @@ export const LIMITS = {
   pairMessage: 8 * KiB,
   pairMessages: 8,
   pairSlots: 3,
+  joinRequests: 3,
+  joinName: 64,
+  joinCode: 512,
 } as const;
