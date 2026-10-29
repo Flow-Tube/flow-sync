@@ -88,7 +88,12 @@ FLOW-SYNC/1 apps reject `v:2` and ask the user to update. FLOW-SYNC/2 apps still
 
 ### Channel
 
-The scanner reaches the shower over the LAN when an `l` address answers. Otherwise, when the shower is a member, it uses the store's pairing mailbox ([store.md](store.md#pairing-mailbox)). Both sides derive `K_ab`, `K_ba` and the SAS ([crypto.md](crypto.md#pairing)). Every message is a box, numbered from 0 in each direction. The scanner's first message starts with its ephemeral X25519 public key (32 bytes), in the clear, followed by the box: the shower needs that key to derive the keys that open it.
+The scanner reaches the shower over the LAN when an `l` address answers. Otherwise, when the shower is a member, it uses the store's pairing mailbox ([store.md](store.md#pairing-mailbox)). Both sides derive `K_ab`, `K_ba` and the SAS ([crypto.md](crypto.md#pairing)). Every message is a box, numbered from 0 in each direction.
+
+The scanner first sends its ephemeral X25519 public key (32 bytes) in the clear, because the shower needs it to derive the keys:
+
+- **LAN:** the scanner tries the `l` addresses in order, each with a 3-second connect timeout, and opens a WebSocket to `ws://<a>:<p>/flow-sync/2/pair`. Its first binary frame is the key; every later frame, in both directions, is one message. The shower serves one scanner at a time, and drops a connection as soon as a box from it fails to open.
+- **Mailbox:** the key is the prefix of the scanner's first message.
 
 The shower keeps the slot open for 180 seconds and then closes it, as in FLOW-SYNC/1. Neither side compares clocks.
 
