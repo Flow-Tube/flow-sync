@@ -28,6 +28,13 @@ CREATE TABLE IF NOT EXISTS join_requests (id TEXT PRIMARY KEY, name TEXT NOT NUL
   code TEXT);
 `;
 
+/** Columns added after their table shipped; adding them in place keeps existing rows. */
+const ADDED_COLUMNS = [
+  { table: "join_requests", column: "declined", type: "INTEGER NOT NULL DEFAULT 0" },
+];
+
+const UNANSWERED = "id = ? AND expires > ? AND code IS NULL AND declined = 0";
+
 const GROUP_TABLES = [
   "roster",
   "keys",
@@ -47,6 +54,12 @@ export function openSqlite(path: string): Storage {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
   db.exec(SCHEMA);
+  for (const { table, column, type } of ADDED_COLUMNS) {
+    const exists = db
+      .prepare("SELECT 1 FROM pragma_table_info(?) WHERE name = ?")
+      .get(table, column);
+    if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+  }
 
   const one = (sql: string, ...params: (string | number | Uint8Array)[]) =>
     db.prepare(sql).get(...params) as Row | undefined;
@@ -219,8 +232,10 @@ export function openSqlite(path: string): Storage {
     },
     async addJoinRequest({ id, name, expires }, max, now) {
       return transaction(() => {
-        const live = one("SELECT COUNT(*) AS n FROM join_requests WHERE expires > ?", now)
-          ?.n as number;
+        const live = one(
+          "SELECT COUNT(*) AS n FROM join_requests WHERE expires > ? AND declined = 0",
+          now,
+        )?.n as number;
         if (live >= max) return false;
         const sql = "INSERT OR IGNORE INTO join_requests (id, name, expires) VALUES (?, ?, ?)";
         return run(sql, id, name, expires).changes === 1;
@@ -228,25 +243,31 @@ export function openSqlite(path: string): Storage {
     },
     async openJoinRequests(now) {
       const sql =
-        "SELECT id, name, expires FROM join_requests WHERE expires > ? AND code IS NULL ORDER BY expires";
+        "SELECT id, name, expires FROM join_requests WHERE expires > ? AND code IS NULL AND declined = 0 ORDER BY expires";
       return db.prepare(sql).all(now) as unknown as JoinRequest[];
     },
     async answerJoinRequest(id, code, now) {
-      const sql = "UPDATE join_requests SET code = ? WHERE id = ? AND expires > ? AND code IS NULL";
-      return run(sql, code, id, now).changes === 1;
+      return (
+        run(`UPDATE join_requests SET code = ? WHERE ${UNANSWERED}`, code, id, now).changes === 1
+      );
+    },
+    async declineJoinRequest(id, now) {
+      return (
+        run(`UPDATE join_requests SET declined = 1 WHERE ${UNANSWERED}`, id, now).changes === 1
+      );
     },
     async joinAnswer(id, now) {
-      const row = one("SELECT code FROM join_requests WHERE id = ? AND expires > ?", id, now);
-      return (row?.code as string | null | undefined) ?? undefined;
+      const sql = "SELECT code, declined FROM join_requests WHERE id = ? AND expires > ?";
+      const row = one(sql, id, now);
+      return (
+        row && { code: (row.code as string | null) ?? undefined, declined: row.declined === 1 }
+      );
     },
     async hasJoinRequest(id, now) {
       return (
         one("SELECT 1 AS live FROM join_requests WHERE id = ? AND expires > ?", id, now) !==
         undefined
       );
-    },
-    async deleteJoinRequest(id) {
-      run("DELETE FROM join_requests WHERE id = ?", id);
     },
     async purgeExpired(now) {
       transaction(() => {

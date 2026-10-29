@@ -125,17 +125,29 @@ export function storageContract(name: string, open: () => Promise<Storage> | Sto
       expect(await store.meta.addJoinRequest(request("j2", 50), 2, 0)).toBe(true);
       expect(await store.meta.addJoinRequest(request("j3", 100), 2, 0)).toBe(false);
       expect(await store.meta.openJoinRequests(0)).toEqual([request("j2", 50), request("j1", 100)]);
-      expect(await store.meta.joinAnswer("j1", 0)).toBeUndefined();
+      expect(await store.meta.joinAnswer("j1", 0)).toEqual({ code: undefined, declined: false });
       expect(await store.meta.answerJoinRequest("j1", "code", 0)).toBe(true);
       expect(await store.meta.answerJoinRequest("j1", "other", 0)).toBe(false);
-      expect(await store.meta.joinAnswer("j1", 0)).toBe("code");
+      expect(await store.meta.declineJoinRequest("j1", 0)).toBe(false);
+      expect(await store.meta.joinAnswer("j1", 0)).toEqual({ code: "code", declined: false });
       expect(await store.meta.openJoinRequests(0)).toEqual([request("j2", 50)]);
       expect(await store.meta.hasJoinRequest("j2", 60)).toBe(false);
       expect(await store.meta.answerJoinRequest("j2", "code", 60)).toBe(false);
+      expect(await store.meta.joinAnswer("j2", 60)).toBeUndefined();
       await store.meta.purgeExpired(60);
       expect(await store.meta.addJoinRequest(request("j3", 100), 2, 60)).toBe(true);
-      await store.meta.deleteJoinRequest("j1");
-      expect(await store.meta.hasJoinRequest("j1", 0)).toBe(false);
+    });
+
+    test("a declined join request stays declined until it expires", async () => {
+      const request = (id: string) => ({ id, name: `Phone ${id}`, expires: 100 });
+      expect(await store.meta.addJoinRequest(request("j1"), 1, 0)).toBe(true);
+      expect(await store.meta.declineJoinRequest("j1", 0)).toBe(true);
+      expect(await store.meta.declineJoinRequest("j1", 0)).toBe(false);
+      expect(await store.meta.answerJoinRequest("j1", "code", 0)).toBe(false);
+      expect(await store.meta.openJoinRequests(0)).toEqual([]);
+      expect(await store.meta.joinAnswer("j1", 0)).toEqual({ code: undefined, declined: true });
+      expect(await store.meta.addJoinRequest(request("j2"), 1, 0)).toBe(true);
+      expect(await store.meta.joinAnswer("j1", 100)).toBeUndefined();
     });
 
     test("reset keeps only the named settings", async () => {
