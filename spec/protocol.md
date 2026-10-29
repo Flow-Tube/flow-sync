@@ -167,7 +167,7 @@ Batches are deltas: records changed since the device's previous batch for that c
 
 Clocks are hybrid logical clocks: a device persists the highest physical time of any stamp it has applied, and stamps a local edit with at least that time plus one millisecond, so an edit made after reading another device's change wins over it even when this device's clock is behind. Devices warn when their clock differs from the store's `Date` by more than 2 minutes, because last-writer-wins still follows device clocks.
 
-Group members go beyond FLOW-SYNC/1, on every transport: a `subscriptions` record carries `members`, `[{"channelId","hlc","deleted"}]` sorted by `channelId`, next to `channelIds`. Members merge like playlist items: last writer wins per channel, and removing a channel leaves a tombstone. `channelIds` stays the list of live members for apps that don't know `members`, and a record without `members` counts each of its `channelIds` as present at the record's `hlc`.
+Group members go beyond FLOW-SYNC/1, on every transport: a `subscriptions` record carries `members`, `[{"channelId","hlc","deleted"}]` sorted by `channelId`, next to `channelIds`. Members merge like playlist items: last writer wins per channel, and removing a channel leaves a tombstone. `members` is left out when a group has none. `channelIds` stays the list of live members for apps that don't know `members`, and a record without `members` counts each of its `channelIds` as present at the record's `hlc`.
 
 `flow_neuro_brain` SHOULD be sent at most once every 6 hours.
 
