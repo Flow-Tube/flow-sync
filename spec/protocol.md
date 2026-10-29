@@ -131,8 +131,8 @@ On a Flow server, a new device can ask to join instead of scanning a code ([api.
 
 1. The new device posts a join request with the admin token: a random 16-byte `id` (hex) and its device name, at most 64 characters. A request lasts 180 seconds, and at most 3 are pending.
 2. Linked devices list pending requests while Linked devices is open and on each sync, and ask the user: "*name* wants to join".
-3. A member that accepts makes an offer exactly as for a QR code, posts the code to the request, and waits as the shower through the pairing mailbox. Declining deletes the request.
-4. The new device polls its request with the admin token until the code arrives, then pairs as the scanner of that code.
+3. A member that accepts makes an offer exactly as for a QR code, posts the code to the request, and waits as the shower through the pairing mailbox. A member that declines marks the request declined; it then no longer counts toward the 3 pending.
+4. The new device polls its request with the admin token until the code arrives, then pairs as the scanner of that code. If a member declined, the poll answers `declined` until the request would have expired, and the new device stops and tells the user. A request that expires unanswered reads as unknown.
 
 The six-digit check still decides. The name in a request is unauthenticated, and a server that swaps codes makes the two devices show different digits.
 

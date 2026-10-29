@@ -59,14 +59,16 @@ export interface MetaStore {
   deleteSlot(slot: string): Promise<void>;
   /** Returns false when the id exists or `max` live requests are pending. */
   addJoinRequest(request: JoinRequest, max: number, now: number): Promise<boolean>;
-  /** Live requests that no member answered yet. */
+  /** Live requests that no member answered or declined yet. */
   openJoinRequests(now: number): Promise<JoinRequest[]>;
-  /** Returns false when the request is unknown, expired or already answered. */
+  /** Returns false when the request is unknown, expired, already answered or declined. */
   answerJoinRequest(id: string, code: string, now: number): Promise<boolean>;
-  joinAnswer(id: string, now: number): Promise<string | undefined>;
+  /** Returns false when the request is unknown, expired, already answered or declined. */
+  declineJoinRequest(id: string, now: number): Promise<boolean>;
+  /** Undefined when the request is unknown or expired. */
+  joinAnswer(id: string, now: number): Promise<JoinAnswer | undefined>;
   /** True when a live request with this id exists, answered or not. */
   hasJoinRequest(id: string, now: number): Promise<boolean>;
-  deleteJoinRequest(id: string): Promise<void>;
   /** Drops expired challenges, pairing slots and join requests. */
   purgeExpired(now: number): Promise<void>;
 }
@@ -75,6 +77,11 @@ export interface JoinRequest {
   id: string;
   name: string;
   expires: number;
+}
+
+export interface JoinAnswer {
+  code: string | undefined;
+  declined: boolean;
 }
 
 /** Object bytes, addressed by their SHA-256. */

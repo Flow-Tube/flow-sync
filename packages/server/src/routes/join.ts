@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { requireAdmin } from "../auth/admin.ts";
 import { type AuthDeps, requireMember } from "../auth/device.ts";
@@ -24,8 +24,12 @@ export function joinRoutes(deps: AuthDeps, config: Config, guards: Guards) {
   const { meta, group, now } = deps;
   const member = requireMember(deps);
   const admin = requireAdmin(config, guards);
-  const id = (c: { req: { param: (name: string) => string | undefined } }) =>
-    c.req.param("id") as string;
+  const id = (c: Context<AppEnv>) => c.req.param("id") as string;
+  /** 404 when the request is unknown or expired, 409 when a member already answered or declined it. */
+  const settled = async (c: Context<AppEnv>, done: boolean, status: 201 | 204) => {
+    if (done) return c.body(null, status);
+    throw new HttpError((await meta.hasJoinRequest(id(c), now())) ? "conflict" : "not_found");
+  };
 
   return new Hono<AppEnv>()
     .post("/v1/join", limitBody(LIMITS.jsonBody), admin, async (c) => {
@@ -40,16 +44,15 @@ export function joinRoutes(deps: AuthDeps, config: Config, guards: Guards) {
     .get("/v1/join", member, async (c) => c.json({ requests: await meta.openJoinRequests(now()) }))
     .put(`/v1/join/${ID}`, limitBody(LIMITS.jsonBody), member, async (c) => {
       const { code } = await readJson(c, answerSchema);
-      if (await meta.answerJoinRequest(id(c), code, now())) return c.body(null, 201);
-      throw new HttpError((await meta.hasJoinRequest(id(c), now())) ? "conflict" : "not_found");
+      return settled(c, await meta.answerJoinRequest(id(c), code, now()), 201);
     })
     .get(`/v1/join/${ID}`, admin, async (c) => {
-      const code = await meta.joinAnswer(id(c), now());
-      if (code === undefined) throw new HttpError("not_found");
-      return c.json({ code });
+      const answer = await meta.joinAnswer(id(c), now());
+      if (answer?.declined) throw new HttpError("declined");
+      if (answer?.code === undefined) throw new HttpError("not_found");
+      return c.json({ code: answer.code });
     })
-    .delete(`/v1/join/${ID}`, member, async (c) => {
-      await meta.deleteJoinRequest(id(c));
-      return c.body(null, 204);
-    });
+    .delete(`/v1/join/${ID}`, member, async (c) =>
+      settled(c, await meta.declineJoinRequest(id(c), now()), 204),
+    );
 }

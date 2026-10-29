@@ -17,6 +17,7 @@ The Flow server is a store ([store.md](store.md)) with extras: authenticated acc
 | `forbidden` | 403 | Valid token, but not allowed for this path |
 | `not_found` | 404 | No such object |
 | `conflict` | 409 | Different bytes already at this path, or a stale roster head |
+| `declined` | 410 | A member declined this join request |
 | `too_large` | 413 | Over a size limit |
 | `unsupported` | 415 | Wrong `Content-Type` |
 | `quota` | 507 | Instance storage quota reached |
@@ -70,10 +71,10 @@ The operator sets `FLOW_SYNC_ADMIN_TOKEN`, or `FLOW_SYNC_ADMIN_TOKEN_FILE` namin
 | `GET /v1/pair/<slot>/<name>` | slot | | box bytes, or 404 |
 | `DELETE /v1/pair/<slot>` | token | | 204 |
 | `POST /v1/join` | admin | `{"id":"<hex>","name":"…"}` | 201 `{"expires":<ms>}`, or 409 when the id exists or 3 requests are pending |
-| `GET /v1/join` | token | | `{"requests":[{"id","name","expires"}]}`: pending requests not answered yet |
-| `PUT /v1/join/<id>` | token | `{"code":"<QR code JSON>"}` | 201, 404 when unknown or expired, 409 when already answered |
-| `GET /v1/join/<id>` | admin | | `{"code":"…"}`, or 404 until a member answers |
-| `DELETE /v1/join/<id>` | token | | 204: a member declined |
+| `GET /v1/join` | token | | `{"requests":[{"id","name","expires"}]}`: pending requests not answered or declined yet |
+| `PUT /v1/join/<id>` | token | `{"code":"<QR code JSON>"}` | 201, 404 when unknown or expired, 409 when already answered or declined |
+| `GET /v1/join/<id>` | admin | | `{"code":"…"}`; 410 `declined` when a member declined, until the request expires; otherwise 404 until a member answers |
+| `DELETE /v1/join/<id>` | token | | 204: a member declined. 404 when unknown or expired, 409 when already answered or declined |
 | `GET /v1/live` | token | WebSocket upgrade | see [live.md](live.md) |
 | `GET /v1/status` | token | | `{"used":bytes,"quota":bytes,"objects":n,"devices":{"<did>":{"seen":<ms>}}}` |
 | `GET /v1/admin/usage` | admin | | as status, plus roster size |

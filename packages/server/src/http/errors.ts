@@ -9,6 +9,7 @@ const STATUS = {
   forbidden: 403,
   not_found: 404,
   conflict: 409,
+  declined: 410,
   too_large: 413,
   unsupported: 415,
   rate_limited: 429,

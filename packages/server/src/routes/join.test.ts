@@ -70,4 +70,22 @@ describe("join requests", () => {
     expect(del.status).toBe(204);
     expect((await h.ask()).status).toBe(201);
   });
+
+  test("a declined request tells the waiting device until it expires", async () => {
+    const h = await setup();
+    await h.ask();
+    const decline = () =>
+      h.app.request(`/v1/join/${h.id}`, { ...bearer(h.token), method: "DELETE" });
+    expect((await decline()).status).toBe(204);
+    expect((await decline()).status).toBe(409);
+    expect((await h.app.request(`/v1/join/${h.id}`, answer("code", h.token))).status).toBe(409);
+    const listed = (await (await h.app.request("/v1/join", bearer(h.token))).json()) as Listed;
+    expect(listed.requests).toEqual([]);
+    const waiting = await h.app.request(`/v1/join/${h.id}`, bearer(ADMIN_TOKEN));
+    expect(waiting.status).toBe(410);
+    expect(await waiting.json()).toEqual({ error: "declined" });
+    h.clock.now += LIMITS.pairMs;
+    expect((await h.app.request(`/v1/join/${h.id}`, bearer(ADMIN_TOKEN))).status).toBe(404);
+    expect((await decline()).status).toBe(404);
+  });
 });
