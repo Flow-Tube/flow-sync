@@ -93,7 +93,7 @@ test("two devices pair, sync, survive a hostile store, remove and recover", asyn
 
   // B pairs through the mailbox; both screens show the same code.
   const b = new SimDevice(base, newKeys());
-  const { showerSas, scannerSas } = await pairThroughMailbox(a, b);
+  const { showerSas, scannerSas } = await pairThroughMailbox(a, b, base);
   expect(showerSas).toBe(scannerSas);
 
   // Sync both ways, in stream order.
