@@ -11,6 +11,7 @@ import { LiveHub } from "./live/hub.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { claimRoutes } from "./routes/claim.ts";
+import { joinRoutes } from "./routes/join.ts";
 import { keyRoutes } from "./routes/keys.ts";
 import { liveRoutes } from "./routes/live.ts";
 import { metaRoutes } from "./routes/meta.ts";
@@ -64,6 +65,7 @@ export function createApp(deps: AppDeps) {
   app.route("/", keyRoutes(members));
   app.route("/", objectRoutes({ ...members, blobs: deps.storage.blobs }, deps.config));
   app.route("/", pairRoutes(members));
+  app.route("/", joinRoutes(members, deps.config, guards));
   app.route("/", statusRoutes(members, deps.config));
   const hub = new LiveHub(group, deps.now);
   if (deps.upgradeWebSocket) app.route("/", liveRoutes(members, hub, deps.upgradeWebSocket));

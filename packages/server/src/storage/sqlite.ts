@@ -1,6 +1,14 @@
 import { DatabaseSync } from "node:sqlite";
 import { equalBytes } from "@flow-sync/protocol";
-import type { BlobStore, Change, MetaStore, ObjectRecord, PutResult, Storage } from "./types.ts";
+import type {
+  BlobStore,
+  Change,
+  JoinRequest,
+  MetaStore,
+  ObjectRecord,
+  PutResult,
+  Storage,
+} from "./types.ts";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -16,6 +24,8 @@ CREATE TABLE IF NOT EXISTS challenges (id TEXT PRIMARY KEY, did TEXT NOT NULL, e
 CREATE TABLE IF NOT EXISTS slots (slot TEXT PRIMARY KEY, expires INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS pair_messages (slot TEXT NOT NULL, name TEXT NOT NULL, data BLOB NOT NULL,
   PRIMARY KEY (slot, name));
+CREATE TABLE IF NOT EXISTS join_requests (id TEXT PRIMARY KEY, name TEXT NOT NULL, expires INTEGER NOT NULL,
+  code TEXT);
 `;
 
 const GROUP_TABLES = [
@@ -27,6 +37,7 @@ const GROUP_TABLES = [
   "challenges",
   "slots",
   "pair_messages",
+  "join_requests",
 ];
 
 type Row = Record<string, unknown>;
@@ -206,9 +217,41 @@ export function openSqlite(path: string): Storage {
         run("DELETE FROM slots WHERE slot = ?", slot);
       });
     },
+    async addJoinRequest({ id, name, expires }, max, now) {
+      return transaction(() => {
+        const live = one("SELECT COUNT(*) AS n FROM join_requests WHERE expires > ?", now)
+          ?.n as number;
+        if (live >= max) return false;
+        const sql = "INSERT OR IGNORE INTO join_requests (id, name, expires) VALUES (?, ?, ?)";
+        return run(sql, id, name, expires).changes === 1;
+      });
+    },
+    async openJoinRequests(now) {
+      const sql =
+        "SELECT id, name, expires FROM join_requests WHERE expires > ? AND code IS NULL ORDER BY expires";
+      return db.prepare(sql).all(now) as unknown as JoinRequest[];
+    },
+    async answerJoinRequest(id, code, now) {
+      const sql = "UPDATE join_requests SET code = ? WHERE id = ? AND expires > ? AND code IS NULL";
+      return run(sql, code, id, now).changes === 1;
+    },
+    async joinAnswer(id, now) {
+      const row = one("SELECT code FROM join_requests WHERE id = ? AND expires > ?", id, now);
+      return (row?.code as string | null | undefined) ?? undefined;
+    },
+    async hasJoinRequest(id, now) {
+      return (
+        one("SELECT 1 AS live FROM join_requests WHERE id = ? AND expires > ?", id, now) !==
+        undefined
+      );
+    },
+    async deleteJoinRequest(id) {
+      run("DELETE FROM join_requests WHERE id = ?", id);
+    },
     async purgeExpired(now) {
       transaction(() => {
         run("DELETE FROM challenges WHERE expires <= ?", now);
+        run("DELETE FROM join_requests WHERE expires <= ?", now);
         run(
           "DELETE FROM pair_messages WHERE slot IN (SELECT slot FROM slots WHERE expires <= ?)",
           now,

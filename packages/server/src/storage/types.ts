@@ -57,8 +57,24 @@ export interface MetaStore {
   putPairMessage(slot: string, name: string, data: Uint8Array): Promise<PutResult>;
   getPairMessage(slot: string, name: string): Promise<Uint8Array | undefined>;
   deleteSlot(slot: string): Promise<void>;
-  /** Drops expired challenges and pairing slots. */
+  /** Returns false when the id exists or `max` live requests are pending. */
+  addJoinRequest(request: JoinRequest, max: number, now: number): Promise<boolean>;
+  /** Live requests that no member answered yet. */
+  openJoinRequests(now: number): Promise<JoinRequest[]>;
+  /** Returns false when the request is unknown, expired or already answered. */
+  answerJoinRequest(id: string, code: string, now: number): Promise<boolean>;
+  joinAnswer(id: string, now: number): Promise<string | undefined>;
+  /** True when a live request with this id exists, answered or not. */
+  hasJoinRequest(id: string, now: number): Promise<boolean>;
+  deleteJoinRequest(id: string): Promise<void>;
+  /** Drops expired challenges, pairing slots and join requests. */
   purgeExpired(now: number): Promise<void>;
+}
+
+export interface JoinRequest {
+  id: string;
+  name: string;
+  expires: number;
 }
 
 /** Object bytes, addressed by their SHA-256. */

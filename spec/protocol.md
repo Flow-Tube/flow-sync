@@ -123,6 +123,17 @@ Each message is canonical JSON with a `type`, carried as a payload in a box.
 
 N pins the head from `welcome`. A store that later shows N a different history at or below that `seq` is treated as a fork.
 
+### Joining with the admin token
+
+On a Flow server, a new device can ask to join instead of scanning a code ([api.md](api.md)):
+
+1. The new device posts a join request with the admin token: a random 16-byte `id` (hex) and its device name, at most 64 characters. A request lasts 180 seconds, and at most 3 are pending.
+2. Linked devices list pending requests while Linked devices is open and on each sync, and ask the user: "*name* wants to join".
+3. A member that accepts makes an offer exactly as for a QR code, posts the code to the request, and waits as the shower through the pairing mailbox. Declining deletes the request.
+4. The new device polls its request with the admin token until the code arrives, then pairs as the scanner of that code.
+
+The six-digit check still decides. The name in a request is unauthenticated, and a server that swaps codes makes the two devices show different digits.
+
 ## Removal
 
 Any remaining device can remove one or more devices, including one that is lost:
