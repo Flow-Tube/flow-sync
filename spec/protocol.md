@@ -134,6 +134,7 @@ To restore onto a new device, the user enters the words and the store location (
 2. Unwraps the latest `K_e` from the recovery member's wrap and checks `kc`.
 3. Creates its own device keys, writes wraps of `K_(e+1)`, and appends a `restore` entry signed by the recovery key.
 4. Immediately creates a new recovery key, appends a `recovery` entry, and shows the new words.
+5. Reads every log, then links its profile like a `welcome` would: to the link that change batches and snapshot manifests name for profile data, or to its own profile id when they name none. It writes no batch before that. While profiles can't choose their links, a group has one; with several, the user picks.
 
 Every other device shows that the group was restored with the recovery key, and when.
 
