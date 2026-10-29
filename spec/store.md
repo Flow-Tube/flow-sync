@@ -86,23 +86,20 @@ The server stores this layout behind its API, indexes objects by sender and `seq
 ### S3-compatible
 
 - Objects are plain `PutObject` and `GetObject` calls with `Content-Type: application/octet-stream`.
-- To find new objects, a device HEADs the sender's next `seq`; `HEAD` is cheaper than `LIST` on AWS and R2. To catch up, it uses `ListObjectsV2` with `prefix` and `start-after`.
+- To find new objects, a device HEADs the sender's next `seq`, or lists the sender's current shard with `ListObjectsV2` `prefix` and `start-after` (one request either way; the list also returns every newer object at once). To catch up, it uses the same list.
 - Signing is AWS SigV4. Android signs requests itself on OkHttp, because the AWS SDK and minio-java don't fit the APK budget. That code MUST pass AWS's published SigV4 test suite.
 
 ### WebDAV
 
 - `PUT`, `GET`, `MKCOL` and `PROPFIND`, with `Depth` always sent explicitly (`0` or `1`). A request without `Depth` means infinity.
-- To find new objects, a device GETs the sender's next `seq` until a 404, and uses `PROPFIND Depth: 1` only on the current shard. On Nextcloud, a `Depth: 0` request for a folder's ETag shows whether anything inside changed, so devices with no changes can be skipped.
+- To find new objects, a device GETs the sender's next `seq` until a 404, and uses `PROPFIND Depth: 1` only on the current shard. On Nextcloud, a `Depth: 0` request for a folder's ETag shows whether anything inside changed, so a device MAY skip devices with no changes.
 - A 401 stops all requests until the user fixes the credentials: Nextcloud blocks an IP for 30 minutes after 10 failures. Devices SHOULD use Nextcloud Login Flow v2 to get their own app password.
 
 ### Setup probe
 
-Conditional writes are not reliable across backends. B2 rejects `If-None-Match: *`, Garage accepts and ignores it, WebDAV servers check before writing, and rclone's WebDAV server ignores it. When a backend is added, the device writes `probe/<random>` twice with `If-None-Match: *`:
+When a backend is added, the device writes, reads and deletes `probe/<random>`, so wrong credentials, a read-only root or a missing bucket show up before anything else is written.
 
-- 412 on the second write: the header works, and the device sends it on later writes as an extra guard.
-- 501, or 200 again: the device doesn't send it.
-
-Correctness never depends on the result.
+Conditional writes are not reliable across backends. B2 rejects `If-None-Match: *`, Garage accepts and ignores it, WebDAV servers check before writing, and rclone's WebDAV server ignores it. A device MAY write the probe twice with `If-None-Match: *` and send the header on later writes only when the second write returned 412. Correctness never depends on it: paths are never reused, and every object verifies itself.
 
 ### Transport security
 
