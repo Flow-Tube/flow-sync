@@ -55,6 +55,13 @@ Devices advertise `_flow._tcp` over mDNS ([RFC 6762](https://www.rfc-editor.org/
 
 Members compute the tags for the previous, current and next hour and connect only to matching services. Anyone else on the network sees only that a Flow device is present.
 
+Many Wi-Fi networks drop multicast between clients, so mDNS alone isn't enough:
+
+- A device listens on the port it used last, when that port is free.
+- Each device remembers, for every member, the address and port of its last session: the ones it dialed, or the peer's address with the `p` it sent in message 1 or in [pairing](protocol.md#messages).
+- When a member hasn't shown up over mDNS, a device dials its remembered address with a 3-second connect timeout: when the app starts, when the network changes, and at most once a minute while it has something to send or sync.
+- A device forgets a member's address when that member leaves or is removed.
+
 ### Session
 
 The connecting device C opens a WebSocket to `ws://<address>:<port>/flow-sync/2` on the advertising device S. Every frame is `u32(e) ‖ box`, with `e` the epoch whose `P_e,lan` seals the first three messages:
@@ -76,7 +83,7 @@ Later frames are `u64(seq) ‖ Box(K, "FLOW-SYNC/2 lan" ‖ u64(seq), payload)`,
 
 ### Requests
 
-Every box on the LAN holds a [payload](crypto.md#payload-encoding), as everywhere else. Hello bodies are `{"did":"<hex>","n":"<b64>"}`, `{"did","n","sig"}` and `{"sig"}`.
+Every box on the LAN holds a [payload](crypto.md#payload-encoding), as everywhere else. Hello bodies are `{"did":"<hex>","n":"<b64>","p":<port>}`, `{"did","n","sig"}` and `{"sig"}`, where `p` is the port C listens on.
 
 After message 3, either device may send requests at any time, and answers may come in any order. The payload of each frame is a canonical JSON header line, then `\n` and raw bytes when the operation carries them:
 
@@ -102,7 +109,8 @@ A group can live on its devices alone, with no store: its location is `{"k":"lan
 - **Holding.** Every device keeps every roster entry it has seen (fork candidates under their [store names](store.md#layout)), every wrap and chain box, and every log object and blob it has fetched, and serves them with the requests above.
 - **Appending.** A device writes the wraps and then the entry locally; the entry spreads as other devices pull `roster`. Concurrent entries resolve by the [fork rule](protocol.md#forks): a peer whose winning chain doesn't contain the asker's head answers `roster` with everything, so both see every candidate even when they pull at the same moment.
 - **Pairing.** Pairing always runs over the LAN. The member's `welcome` carries `{"k":"lan"}`, and also `entries` (every roster entry up to the head it names) and `wrap` (b64, the new device's wrap of the current epoch): the new device needs both before it can verify the roster or open a LAN session, which starts with `P_e,lan`. After `done`, the member waits up to 5 seconds for the scanner to close the pairing connection, then the devices sync as below.
-- **Syncing.** When two members meet, through mDNS or the address of a recent session, each one pulls from the other: `roster` after its head, the wraps and chain boxes it lacks, then `list` with its version vector and `get` for what it lacks. It merges what it read as from any store, and writes its own objects locally only.
+- **Leaving.** A device that appends a `leave` entry meets every member it can reach, for up to 10 seconds, so they pull the entry before it forgets the group. A member it couldn't reach stays listed until another device removes it.
+- **Syncing.** When two members meet, through mDNS or a remembered address, each one pulls from the other: `roster` after its head, the wraps and chain boxes it lacks, then `list` with its version vector and `get` for what it lacks. It merges what it read as from any store, and writes its own objects locally only.
 
 Groups on a store sync the same way when their devices meet, as well as through the store.
 
