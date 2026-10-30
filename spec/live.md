@@ -47,7 +47,7 @@ Members compute the tags for the previous, current and next hour and connect onl
 Many Wi-Fi networks drop multicast between clients, so mDNS alone isn't enough:
 
 - A device listens on the port it used last, when that port is free.
-- Each device remembers, for every member, the address and port of its last session: the ones it dialed, or the peer's address with the `p` it sent in message 1.
+- Each device remembers, for every member, the address and port of its last session: the ones it dialed, or the peer's address with the `p` it sent in message 1 or in [pairing](protocol.md#messages).
 - When a member hasn't shown up over mDNS, a device dials its remembered address with a 3-second connect timeout: when the app starts, when the network changes, and at most once a minute while it has something to send or sync.
 - A device forgets a member's address when that member leaves or is removed.
 
