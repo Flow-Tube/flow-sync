@@ -8,13 +8,24 @@ The payload content is canonical JSON:
 
 | `type` | Fields | Meaning |
 |---|---|---|
-| `presence` | `can`: list of `play`, `remote` | The sender is online and what it accepts |
-| `now` | `video`, `title`, `pos` (ms), `dur` (ms), `state` (`playing` or `paused`), `vol` (0 to 100), `queue` (video ids, at most 50) | What the sender is playing |
-| `play` | `to`, `video`, `pos` (ms), `music` (bool), `link` (link id or `null`) | Ask device `to` to play a video from a position, in the linked profile |
+| `presence` | `can`: list of `play`, `remote`; `kind`: `phone`, `tablet`, `tv` or `desktop` | The sender is online, what it accepts, and which icon shows it |
+| `now` | `video`, `title`, `by` (channel or artist), `music` (bool), `link` (link id or `null`), `pos` (ms), `dur` (ms), `state` (`playing` or `paused`), `vol` (0 to 100), `queue` (video ids, at most 50), `index` (the video's place in `queue`) | What the sender is playing; `video` is `null` when nothing is loaded |
+| `play` | `to`, `video`, `pos` (ms), `music` (bool), `link` (link id or `null`), `queue` (video ids, at most 50), `index`, `state` (`playing` or `paused`) | Hand the sender's session to device `to`: the same queue and place, from that position, in the linked profile |
 | `cmd` | `to`, `cmd` (`play`, `pause`, `seek`, `next`, `previous`, `volume`, `queue`), and `pos`, `vol` or `queue` as the command needs | Control playback on device `to` |
 | `result` | `to`, `ref` (the counter of the message answered), `ok` (bool), `reason` | The outcome of `play` or `cmd` |
 
 `to` is inside the ciphertext. Every message goes to every connected device of the group, so the relay doesn't learn who controls whom. A device ignores `play`, `cmd` and `result` messages not addressed to it.
+
+### Playing on another device
+
+Handoff works like a single active player per group, as in Spotify Connect:
+
+- A device sends `now` when what it plays changes (video, state, queue, volume, a seek) and every 30 seconds while playing. Receivers advance `pos` from the time they received it while `state` is `playing`, so progress moves without more messages. A device that stops playing sends `now` with `video` `null` once.
+- The active device is the one whose latest `now` is `playing`; when several are, the most recent wins.
+- To move playback, the sender sends `play` to the target with its whole session. The target starts it and answers `result`. Only after `ok: true` does the sender pause its own player, so a failed handoff never stops the music. The target's next `now` makes it the active device on every screen.
+- To pull playback to itself, a device sends `cmd` `pause` to the active device and starts the session from that device's latest `now`.
+- Controls for another device are `cmd` messages; the target applies them and sends `now`.
+- Devices offline from the live channel and the LAN show the last time they were seen, from the server's `/v1/status` `seen` or the last LAN session.
 
 ### Consent
 
