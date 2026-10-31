@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createApp } from "../app.ts";
 import { loadConfig } from "../config.ts";
 import { clientIp, listen, upgradeWebSocket } from "../runtime/node.ts";
-import { openSqlite } from "../storage/sqlite.ts";
+import { storageFromEnv } from "../storage/from-env.ts";
 
 const env = { ...process.env };
 if (env.FLOW_SYNC_ADMIN_TOKEN_FILE) {
@@ -12,7 +12,7 @@ if (env.FLOW_SYNC_ADMIN_TOKEN_FILE) {
 const server = listen(
   createApp({
     config: loadConfig(env, true),
-    storage: openSqlite(env.FLOW_SYNC_DATA ?? "/data/flow-sync.db"),
+    storage: storageFromEnv(env),
     log: (line) => console.log(JSON.stringify(line)),
     now: Date.now,
     clientIp: clientIp(env.FLOW_SYNC_TRUST_PROXY === "1"),

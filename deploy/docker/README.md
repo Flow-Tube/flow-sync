@@ -23,6 +23,7 @@ Use the admin token once, from Flow, to claim the instance. Set `FLOW_SYNC_ADMIN
 | `FLOW_SYNC_TRUST_PROXY` | off | `1` takes the client address from the proxy's `X-Forwarded-For` |
 | `FLOW_SYNC_SECURITY_CONTACT`, `FLOW_SYNC_SECURITY_EXPIRES` | none | Serve `/.well-known/security.txt` |
 | `FLOW_SYNC_DATA` | `/data/flow-sync.db` | SQLite database path |
+| `FLOW_SYNC_DATABASE_URL` or `DATABASE_URL` | none | Stores everything in Postgres instead of SQLite. Set `PGSSLMODE` if the database needs TLS |
 | `PORT` | 8080 | Listening port |
 
 Guides for NAS systems and other hosts arrive with the release.
