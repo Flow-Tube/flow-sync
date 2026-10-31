@@ -81,7 +81,7 @@ describe("live relay", () => {
     const b = await connect(h.port, h.tokenB);
     const { entry, wraps, chain, head } = await removal(h, h.tokenA, toHex(h.joining.did));
     expect((await append(h, h.tokenA, { entry, wraps, chain }, head)).status).toBe(201);
-    await h.hub.sweep();
+    await h.relay?.sweep();
     expect(await b.closed).toBe(1008);
   });
 });

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createApp } from "../app.ts";
 import { loadConfig } from "../config.ts";
-import { clientIp, listen, upgradeWebSocket } from "../runtime/node.ts";
+import { clientIp, listen, nodeLive } from "../runtime/node.ts";
 import { storageFromEnv } from "../storage/from-env.ts";
 
 const env = { ...process.env };
@@ -16,7 +16,7 @@ const server = listen(
     log: (line) => console.log(JSON.stringify(line)),
     now: Date.now,
     clientIp: clientIp(env.FLOW_SYNC_TRUST_PROXY === "1"),
-    upgradeWebSocket,
+    live: nodeLive,
   }),
   Number(env.PORT ?? 8080),
   ({ port }) => console.log(JSON.stringify({ event: "listening", port })),

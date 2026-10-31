@@ -1,8 +1,7 @@
 import { type Context, Hono } from "hono";
-import type { UpgradeWebSocket, WSMessageReceive } from "hono/ws";
 import { type AuthDeps, requireMember } from "../auth/device.ts";
 import type { AppEnv } from "../env.ts";
-import type { Connection, LiveHub } from "../live/hub.ts";
+import type { LiveRelay } from "../live/relay.ts";
 
 export const LIVE_PROTOCOL = "flow-sync.v1";
 const BEARER = "bearer.";
@@ -17,29 +16,10 @@ function liveToken(c: Context): string | undefined {
   return protocols.find((p) => p.startsWith(BEARER))?.slice(BEARER.length);
 }
 
-async function bytesOf(data: WSMessageReceive): Promise<Uint8Array | string> {
-  if (typeof data === "string") return data;
-  if (data instanceof Blob) return new Uint8Array(await data.arrayBuffer());
-  return new Uint8Array(data);
-}
-
-export function liveRoutes(deps: AuthDeps, hub: LiveHub, upgradeWebSocket: UpgradeWebSocket) {
+export function liveRoutes(deps: AuthDeps, relay: LiveRelay) {
   return new Hono<AppEnv>().get(
     "/v1/live",
     requireMember(deps, { token: liveToken }),
-    upgradeWebSocket((c) => {
-      let connection: Connection | undefined;
-      return {
-        onOpen: (_event, ws) => {
-          connection = hub.join(c.get("did"), c.get("tokenExpires"), ws);
-        },
-        onMessage: async (event) => {
-          if (connection) await hub.relay(connection, await bytesOf(event.data));
-        },
-        onClose: () => {
-          if (connection) hub.leave(connection);
-        },
-      };
-    }),
+    relay.upgrade,
   );
 }
