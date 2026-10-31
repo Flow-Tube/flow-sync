@@ -29,7 +29,7 @@ export interface MetaStore {
   getSetting(key: string): Promise<string | undefined>;
   /** Returns false when the key already exists. */
   setSettingOnce(key: string, value: string): Promise<boolean>;
-  /** Deletes the group and everything in it; instance settings survive. */
+  /** Deletes the group and everything in it except blobs; instance settings survive. */
   reset(keep: string[]): Promise<void>;
 
   rosterAfter(seq: number, limit: number): Promise<string[]>;
@@ -89,6 +89,8 @@ export interface BlobStore {
   put(hash: string, data: Uint8Array): Promise<void>;
   get(hash: string): Promise<Uint8Array | undefined>;
   delete(hash: string): Promise<void>;
+  /** Deletes every blob, for an admin reset. */
+  clear(): Promise<void>;
 }
 
 export interface Storage {

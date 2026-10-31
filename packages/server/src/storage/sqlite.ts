@@ -39,7 +39,6 @@ const GROUP_TABLES = [
   "roster",
   "keys",
   "objects",
-  "blobs",
   "devices",
   "challenges",
   "slots",
@@ -291,6 +290,9 @@ export function openSqlite(path: string): Storage {
     },
     async delete(hash) {
       run("DELETE FROM blobs WHERE hash = ?", hash);
+    },
+    async clear() {
+      run("DELETE FROM blobs");
     },
   };
 
