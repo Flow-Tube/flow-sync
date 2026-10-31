@@ -11,3 +11,7 @@ allowBuilds:
   protobufjs: false
   ssh2: false
   workerd: false
+
+# @vercel/blob reaches zod 4.1.11 (GHSA-mrhx-c7xc-m3w5) through @vercel/cli-config; same major, fixed.
+overrides:
+  "@vercel/cli-config>zod": 4.6.7
