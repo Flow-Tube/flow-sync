@@ -6,7 +6,7 @@
   "scripts": {
     "build": "esbuild src/entry/node.ts src/entry/healthcheck.ts --bundle --platform=node --target=node24 --format=cjs --out-extension:.js=.cjs --outdir=dist --legal-comments=eof",
     "start": "node src/entry/node.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.workers.json",
     "test": "vitest run"
   },
   "dependencies": {
@@ -20,6 +20,8 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.4.9",
+    "@cloudflare/workers-types": "5.20261027.1",
     "@testcontainers/postgresql": "12.2.1",
     "@types/node": "^24.19.2",
     "@types/pg": "8.23.1",
@@ -28,6 +30,7 @@
     "fast-check": "^4.10.2",
     "testcontainers": "12.2.1",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "wrangler": "4.154.0"
   }
 }

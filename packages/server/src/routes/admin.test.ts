@@ -1,7 +1,8 @@
 import { sha256, toHex } from "@flow-sync/protocol";
 import { describe, expect, test } from "vitest";
-import { ADMIN_TOKEN, bearer, claimedApp, postJson, testApp } from "../testing/app.ts";
+import { claimedApp, testApp } from "../testing/app.ts";
 import { genesis, signIn } from "../testing/group.ts";
+import { ADMIN_TOKEN, bearer, postJson } from "../testing/http.ts";
 import { objectUrl, putBytes, sealedObject } from "../testing/objects.ts";
 
 describe("admin", () => {

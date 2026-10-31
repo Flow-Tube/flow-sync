@@ -8,10 +8,7 @@ import {
   S3Client,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
-import type { BlobStore } from "./types.ts";
-
-/** Under a prefix, so clearing never touches anything else in a shared bucket. */
-const PREFIX = "flow-sync/blobs/";
+import { BLOB_PREFIX, type BlobStore } from "./types.ts";
 
 export function s3Client(config: S3ClientConfig): S3Client {
   return new S3Client({
@@ -24,7 +21,7 @@ export function s3Client(config: S3ClientConfig): S3Client {
 
 /** Blobs as objects in a bucket on AWS S3, R2, or any S3-compatible store. */
 export function openS3Blobs(client: S3Client, bucket: string): BlobStore {
-  const at = (hash: string) => ({ Bucket: bucket, Key: PREFIX + hash });
+  const at = (hash: string) => ({ Bucket: bucket, Key: BLOB_PREFIX + hash });
   return {
     async put(hash, data) {
       await client.send(new PutObjectCommand({ ...at(hash), Body: data }));
@@ -42,7 +39,7 @@ export function openS3Blobs(client: S3Client, bucket: string): BlobStore {
       await client.send(new DeleteObjectCommand(at(hash)));
     },
     async clear() {
-      const pages = paginateListObjectsV2({ client }, { Bucket: bucket, Prefix: PREFIX });
+      const pages = paginateListObjectsV2({ client }, { Bucket: bucket, Prefix: BLOB_PREFIX });
       for await (const { Contents = [] } of pages) {
         if (!Contents.length) continue;
         const Objects = Contents.map(({ Key }) => ({ Key }));

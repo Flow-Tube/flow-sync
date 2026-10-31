@@ -1,7 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { LIMITS } from "../limits.ts";
-import { ADMIN_TOKEN, bearer, claimedApp, postJson, testApp } from "../testing/app.ts";
+import { claimedApp, testApp } from "../testing/app.ts";
 import { signIn } from "../testing/group.ts";
+import { ADMIN_TOKEN, bearer, postJson } from "../testing/http.ts";
 
 const from = (ip: string, init: RequestInit = {}): RequestInit => ({
   ...init,

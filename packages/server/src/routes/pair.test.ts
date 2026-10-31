@@ -1,8 +1,9 @@
 import { pairingSlot, randomBytes, toHex } from "@flow-sync/protocol";
 import { describe, expect, test } from "vitest";
 import { LIMITS } from "../limits.ts";
-import { bearer, claimedApp, postJson } from "../testing/app.ts";
+import { claimedApp } from "../testing/app.ts";
 import { signIn } from "../testing/group.ts";
+import { bearer, postJson } from "../testing/http.ts";
 
 const put = (bytes: Uint8Array): RequestInit => ({
   method: "PUT",

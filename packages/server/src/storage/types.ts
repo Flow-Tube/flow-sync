@@ -84,6 +84,9 @@ export interface JoinAnswer {
   declined: boolean;
 }
 
+/** Object stores keep blobs under this prefix, so clearing never touches the rest of a bucket. */
+export const BLOB_PREFIX = "flow-sync/blobs/";
+
 /** Object bytes, addressed by their SHA-256. */
 export interface BlobStore {
   put(hash: string, data: Uint8Array): Promise<void>;

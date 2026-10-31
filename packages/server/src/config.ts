@@ -24,7 +24,7 @@ export interface Config {
 }
 
 /** `FLOW_SYNC_ADMIN_TOKEN_FILE` is resolved by the entry, which knows how to read files. */
-export function loadConfig(env: Record<string, string | undefined>, live: boolean): Config {
+export function loadConfig(env: Record<string, unknown>, live: boolean): Config {
   const parsed = envSchema.parse(env);
   const token = parsed.FLOW_SYNC_ADMIN === "on" ? parsed.FLOW_SYNC_ADMIN_TOKEN : undefined;
   const { FLOW_SYNC_SECURITY_CONTACT: contact, FLOW_SYNC_SECURITY_EXPIRES: expires } = parsed;

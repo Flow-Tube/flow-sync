@@ -6,6 +6,7 @@ import type { AppEnv } from "../env.ts";
 import { limitBody, readJson } from "../http/body.ts";
 import { HttpError } from "../http/errors.ts";
 import { LIMITS } from "../limits.ts";
+import type { Stored } from "../live/relay.ts";
 
 const appendSchema = z.strictObject({
   entry: z.unknown(),
@@ -14,7 +15,7 @@ const appendSchema = z.strictObject({
 });
 const afterSchema = z.coerce.number().int().min(-1).default(-1);
 
-export function rosterRoutes(deps: AuthDeps & { stored: (did: string) => void }) {
+export function rosterRoutes(deps: AuthDeps & { stored: Stored }) {
   const member = requireMember(deps, { allowRecovery: true });
   return new Hono<AppEnv>()
     .get("/v1/roster", member, async (c) => {
@@ -29,7 +30,7 @@ export function rosterRoutes(deps: AuthDeps & { stored: (did: string) => void })
         throw new HttpError("conflict", { head: state.head });
       }
       await deps.group.append(parseEntry(body.entry), body.wraps, body.chain);
-      deps.stored(c.get("did"));
+      await deps.stored(c.get("did"));
       return c.body(null, 201);
     });
 }

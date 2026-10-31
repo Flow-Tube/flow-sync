@@ -1,8 +1,9 @@
 import { randomBytes, toHex } from "@flow-sync/protocol";
 import { describe, expect, test } from "vitest";
 import { LIMITS } from "../limits.ts";
-import { ADMIN_TOKEN, bearer, claimedApp, postJson } from "../testing/app.ts";
+import { claimedApp } from "../testing/app.ts";
 import { signIn } from "../testing/group.ts";
+import { ADMIN_TOKEN, bearer, postJson } from "../testing/http.ts";
 
 type Listed = { requests: { id: string; name: string; expires: number }[] };
 
