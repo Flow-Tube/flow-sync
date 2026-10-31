@@ -67,6 +67,8 @@ function epochKeys(
 export class Group {
   readonly #meta: MetaStore;
   #state: RosterState | undefined;
+  /** The stored JSON of the cached head, to notice a group replaced by another instance. */
+  #head: string | undefined;
   #instance: Promise<Instance> | undefined;
 
   constructor(meta: MetaStore) {
@@ -85,13 +87,23 @@ export class Group {
     return this.#instance;
   }
 
-  /** Reads entries appended since the cached state, so appends by other server instances are seen. */
+  /**
+   * Reads entries appended since the cached state, so appends by other server instances are seen,
+   * and starts over when the cached head is gone after another instance's admin reset.
+   */
   async roster(): Promise<RosterState | undefined> {
     for (;;) {
-      const entries = await this.#meta.rosterAfter(this.#state?.seq ?? -1, LIMITS.rosterPage);
-      for (const json of entries)
+      const entries = await this.#meta.rosterAfter((this.#state?.seq ?? 0) - 1, LIMITS.rosterPage);
+      const full = entries.length === LIMITS.rosterPage;
+      if (this.#state && entries.shift() !== this.#head) {
+        this.forget();
+        continue;
+      }
+      for (const json of entries) {
         this.#state = applyEntry(this.#state, parseEntry(JSON.parse(json)));
-      if (entries.length < LIMITS.rosterPage) return this.#state;
+        this.#head = json;
+      }
+      if (!full) return this.#state;
     }
   }
 
@@ -116,10 +128,12 @@ export class Group {
     });
     if (!appended) throw new HttpError("conflict", { head: (await this.roster())?.head });
     this.#state = after;
+    this.#head = json;
   }
 
   /** Drops the cached roster after the group is deleted. */
   forget(): void {
     this.#state = undefined;
+    this.#head = undefined;
   }
 }
