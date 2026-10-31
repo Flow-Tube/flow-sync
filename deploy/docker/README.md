@@ -28,7 +28,7 @@ Use the admin token once, from Flow, to claim the instance. Set `FLOW_SYNC_ADMIN
 | `FLOW_SYNC_S3_PATH_STYLE` | off | `1` for stores that need path-style addressing (most self-hosted ones) |
 | `PORT` | 8080 | Listening port |
 
-Guides for NAS systems and other hosts arrive with the release.
+Guides for the other hosts are in [docs](../../docs/README.md).
 
 ## Verifying an image
 

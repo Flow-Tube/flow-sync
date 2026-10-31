@@ -1,0 +1,26 @@
+# Deploy from the repository root (see docs/fly.md):
+#   fly deploy -c deploy/fly/fly.toml --dockerfile deploy/docker/Dockerfile --ha=false
+app = "flow-sync"
+primary_region = "ams"
+
+[env]
+  FLOW_SYNC_TRUST_PROXY = "1"
+
+# SQLite lives on one volume, so the app runs on exactly one machine.
+[[mounts]]
+  source = "flow_sync_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Live sockets need the machine running.
+  auto_stop_machines = "off"
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/v1/health"
+    timeout = "5s"
