@@ -6,7 +6,6 @@ import {
   parseDevicePath,
   parseObject,
   type RosterState,
-  sha256,
   toHex,
   verifyObject,
 } from "@flow-sync/protocol";
@@ -14,6 +13,7 @@ import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { type AuthDeps, requireMember } from "../auth/device.ts";
 import type { Config } from "../config.ts";
+import { sha256Hex } from "../crypto.ts";
 import type { AppEnv } from "../env.ts";
 import { limitBody, octets, readBytes } from "../http/body.ts";
 import { HttpError } from "../http/errors.ts";
@@ -64,7 +64,7 @@ export function objectRoutes(
       const target = devicePath(c);
       if (target.did !== c.get("did")) throw new HttpError("forbidden");
       const bytes = await readBytes(c);
-      const hash = toHex(sha256(bytes));
+      const hash = await sha256Hex(bytes);
       const existing = await meta.getObject(target.path);
       if (existing) {
         if (existing.hash !== hash) throw new HttpError("conflict");

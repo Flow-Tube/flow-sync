@@ -30,7 +30,7 @@ export async function readJson<T extends z.ZodType>(c: Context, schema: T): Prom
   return schema.parse(value);
 }
 
-export async function readBytes(c: Context): Promise<Uint8Array> {
+export async function readBytes(c: Context): Promise<Uint8Array<ArrayBuffer>> {
   requireType(c, "application/octet-stream");
   return new Uint8Array(await c.req.arrayBuffer());
 }

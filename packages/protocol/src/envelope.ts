@@ -79,12 +79,17 @@ export function parseObject(bytes: Uint8Array, group: Uint8Array): ParsedObject 
     prev: bytes.slice(50, 82),
   };
   if (!equalBytes(header.group, group)) fail("group");
+  let hash: Uint8Array | undefined;
   return {
     header,
     headerBytes: bytes.subarray(0, HEADER_SIZE),
     box: bytes.subarray(HEADER_SIZE, bytes.length - SIGNATURE_SIZE),
     signature: bytes.subarray(bytes.length - SIGNATURE_SIZE),
-    hash: sha256(bytes),
+    // Hashed on first use: only a reader following a log chain needs it.
+    get hash() {
+      hash ??= sha256(bytes);
+      return hash;
+    },
   };
 }
 
