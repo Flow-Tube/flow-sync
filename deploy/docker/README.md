@@ -24,6 +24,8 @@ Use the admin token once, from Flow, to claim the instance. Set `FLOW_SYNC_ADMIN
 | `FLOW_SYNC_SECURITY_CONTACT`, `FLOW_SYNC_SECURITY_EXPIRES` | none | Serve `/.well-known/security.txt` |
 | `FLOW_SYNC_DATA` | `/data/flow-sync.db` | SQLite database path |
 | `FLOW_SYNC_DATABASE_URL` or `DATABASE_URL` | none | Stores everything in Postgres instead of SQLite. Set `PGSSLMODE` if the database needs TLS |
+| `FLOW_SYNC_S3_BUCKET` | none | Stores object bytes in this S3 bucket (AWS, R2 or any S3-compatible store) under `flow-sync/blobs/`. Configure it with the standard `AWS_REGION`, `AWS_ENDPOINT_URL_S3`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` |
+| `FLOW_SYNC_S3_PATH_STYLE` | off | `1` for stores that need path-style addressing (most self-hosted ones) |
 | `PORT` | 8080 | Listening port |
 
 Guides for NAS systems and other hosts arrive with the release.
