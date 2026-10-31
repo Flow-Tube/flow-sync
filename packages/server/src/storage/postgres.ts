@@ -59,6 +59,11 @@ const bytes = (value: unknown) => {
   return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength).slice();
 };
 
+/** Heroku and Vercel (Neon) set DATABASE_URL; Netlify Database sets NETLIFY_DATABASE_URL. */
+export function databaseUrl(env: Record<string, string | undefined>): string | undefined {
+  return env.FLOW_SYNC_DATABASE_URL ?? env.DATABASE_URL ?? env.NETLIFY_DATABASE_URL;
+}
+
 export function postgresPool(connectionString: string): pg.Pool {
   const pool = new pg.Pool({ connectionString, types });
   // An idle client lost its connection: the pool drops it, and the next query reports a lasting
