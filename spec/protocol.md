@@ -209,14 +209,14 @@ Group members go beyond FLOW-SYNC/1, on every transport: a `subscriptions` recor
 
 Each synced profile has a *link id*: the UUID of the profile that first published it. The `profiles` collection holds `{"link", "name", "hlc", "deleted"}` records, merged last-writer-wins by `hlc`.
 
-A device writes a `profiles` record for each link it syncs that has none, and a new one when the user renames a linked profile.
+A device writes a `profiles` record for each link it syncs that has none, and a new one when the user renames a linked profile. An empty `name` is a default profile that was never renamed, and apps show their own name for it.
 
 Each device keeps its own map from local profile to link id; a link maps to at most one local profile. Profiles that aren't linked never leave the device. A device in a group keeps at least one profile linked.
 
 - **Linking.** A local profile either starts a link with its own id, or joins a link listed in `profiles`, and its local data then merges with the link's. A device can also create a local profile for a link it doesn't sync yet. A profile that joins a link [reads it from its snapshot](#reading-a-link-from-its-snapshot) before it sends batches for that link.
 - **Inactive profiles.** Both apps run one profile at a time. Batches for a linked profile that isn't active are kept on the device and count as consumed. When that profile becomes active, the device applies them in the order it read them, one transaction per batch, before it sends anything for that link.
 - **Unlinking.** A device that stops syncing a profile removes it from its map and keeps its local data. It skips that link's later batches.
-- **Deleting.** A record with `deleted: true` retires the link for every device: each unlinks its profile and keeps the local data. Its batches no longer hold back [garbage collection](#garbage-collection), so a profile linked to it again starts from what the store still holds.
+- **Deleting.** A record with `deleted: true` retires the link for every device: each unlinks its profile and keeps the local data. Its batches no longer hold back [garbage collection](#garbage-collection), so a profile linked to it again starts from what the store still holds. A device that a delete leaves with no linked profile adds no devices until the user links one.
 
 ### Snapshots
 
