@@ -1,4 +1,5 @@
-import { fromHex, ObjectType, parseObject, toHex, verifyObject } from "@flow-sync/protocol";
+import { fromHex, ObjectType, objectSignature, parseObject, toHex } from "@flow-sync/protocol";
+import { verifySignature } from "../crypto.ts";
 import type { Group } from "../group.ts";
 import { RateLimiter } from "../limits/counters.ts";
 import { LIMITS } from "../limits.ts";
@@ -85,7 +86,7 @@ export class LiveHub {
       const { header } = object;
       const valid = header.type === ObjectType.live && header.epoch === state.epoch;
       if (!valid || toHex(header.sender) !== from.did) throw new Error("invalid live message");
-      verifyObject(object, member.sig);
+      if (!(await verifySignature(objectSignature(object, member.sig)))) throw new Error("forged");
     } catch {
       return this.#close(from, POLICY_VIOLATION);
     }

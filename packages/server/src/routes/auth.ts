@@ -1,17 +1,9 @@
-import {
-  concat,
-  fromB64,
-  fromHex,
-  randomBytes,
-  tag,
-  toB64,
-  toHex,
-  verify,
-} from "@flow-sync/protocol";
+import { concat, fromB64, fromHex, randomBytes, tag, toB64, toHex } from "@flow-sync/protocol";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AuthDeps } from "../auth/device.ts";
 import { issueToken } from "../auth/token.ts";
+import { verifySignature } from "../crypto.ts";
 import type { AppEnv } from "../env.ts";
 import { limitBody, readJson } from "../http/body.ts";
 import { HttpError } from "../http/errors.ts";
@@ -61,7 +53,9 @@ export function authRoutes({ group, meta, now }: AuthDeps) {
         throw new HttpError("unauthorized");
       }
       const message = concat(tag("auth"), instance.id, fromHex(state.group), challenge);
-      if (!verify(member.sig, message, decode(body.sig))) throw new HttpError("unauthorized");
+      const signature = decode(body.sig);
+      if (!(await verifySignature({ key: member.sig, message, signature })))
+        throw new HttpError("unauthorized");
       const expires = now() + LIMITS.tokenMs;
       return c.json({ token: issueToken(instance.secret, fromHex(body.did), expires), expires });
     });

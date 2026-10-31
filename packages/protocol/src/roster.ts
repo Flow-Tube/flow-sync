@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { concat, fromB64, toB64, toHex, utf8 } from "./bytes.ts";
 import { canonical, type Json } from "./canonical.ts";
-import { isValidSigningKey, sign, verify } from "./curve.ts";
+import { isValidSigningKey, type SignatureCheck, sign, verify } from "./curve.ts";
 import { ZERO_HASH } from "./envelope.ts";
 import { fail } from "./errors.ts";
 import { sha256, tag } from "./kdf.ts";
@@ -145,6 +145,21 @@ function checkSigner(entry: Entry, state: RosterState | undefined, added: Map<st
 
 /** Applies one entry to the state before it; throws a FlowSyncError if it is not valid. */
 export function applyEntry(state: RosterState | undefined, entry: Entry): RosterState {
+  const checked = checkEntry(state, entry);
+  for (const { key, message, signature } of checked.signatures) {
+    if (!verify(key, message, signature)) fail("roster-signature");
+  }
+  return checked.state;
+}
+
+/**
+ * Applies every rule except the signature checks, which it returns for the caller to run.
+ * The resulting state is valid only once all of them pass.
+ */
+export function checkEntry(
+  state: RosterState | undefined,
+  entry: Entry,
+): { state: RosterState; signatures: SignatureCheck[] } {
   if (state) {
     if (entry.group !== state.group) fail("roster-chain");
     if (entry.seq !== state.seq + 1 || entry.prev !== state.head || entry.op === "genesis") {
@@ -163,10 +178,11 @@ export function applyEntry(state: RosterState | undefined, entry: Entry): Roster
   const signers = [...new Set([entry.signer, ...added.keys()])];
   if (!sameSet(Object.keys(entry.sigs).sort(), signers)) fail("roster-signature");
   const message = signingBytes(entry);
-  for (const id of signers) {
-    const key = id === entry.signer ? signer.sig : (added.get(id) as Member).sig;
-    if (!verify(key, message, fromB64(entry.sigs[id] as string))) fail("roster-signature");
-  }
+  const signatures = signers.map((id) => ({
+    key: id === entry.signer ? signer.sig : (added.get(id) as Member).sig,
+    message,
+    signature: fromB64(entry.sigs[id] as string),
+  }));
 
   const members = new Map(state?.members);
   for (const id of entry.remove ?? []) {
@@ -206,14 +222,17 @@ export function applyEntry(state: RosterState | undefined, entry: Entry): Roster
   }
 
   return {
-    group: entry.group,
-    seq: entry.seq,
-    head: toHex(entryHash(entry)),
-    epoch,
-    kc: entry.epoch?.kc ?? (state?.kc as string),
-    rotate: entry.op === "leave" || (!entry.epoch && (state?.rotate ?? false)),
-    members,
-    seen,
+    state: {
+      group: entry.group,
+      seq: entry.seq,
+      head: toHex(entryHash(entry)),
+      epoch,
+      kc: entry.epoch?.kc ?? (state?.kc as string),
+      rotate: entry.op === "leave" || (!entry.epoch && (state?.rotate ?? false)),
+      members,
+      seen,
+    },
+    signatures,
   };
 }
 

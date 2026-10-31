@@ -3,17 +3,17 @@ import {
   type DevicePath,
   fromHex,
   ObjectType,
+  objectSignature,
   parseDevicePath,
   parseObject,
   type RosterState,
   toHex,
-  verifyObject,
 } from "@flow-sync/protocol";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { type AuthDeps, requireMember } from "../auth/device.ts";
 import type { Config } from "../config.ts";
-import { sha256Hex } from "../crypto.ts";
+import { sha256Hex, verifySignature } from "../crypto.ts";
 import type { AppEnv } from "../env.ts";
 import { limitBody, octets, readBytes } from "../http/body.ts";
 import { HttpError } from "../http/errors.ts";
@@ -35,7 +35,12 @@ function devicePath(c: Context): DevicePath & { path: string } {
 }
 
 /** Checks that the bytes are what the path claims, signed by the device that owns it. */
-function checkObject(state: RosterState, target: DevicePath, bytes: Uint8Array, hash: string) {
+async function checkObject(
+  state: RosterState,
+  target: DevicePath,
+  bytes: Uint8Array,
+  hash: string,
+) {
   if (target.kind === "blob") {
     if (hash !== target.hash || bytes.length < BOX_OVERHEAD) throw new HttpError("invalid");
     return;
@@ -50,7 +55,7 @@ function checkObject(state: RosterState, target: DevicePath, bytes: Uint8Array, 
   if (!valid) throw new HttpError("invalid");
   const sender = state.members.get(target.did);
   if (!sender) throw new HttpError("forbidden");
-  verifyObject(object, sender.sig);
+  if (!(await verifySignature(objectSignature(object, sender.sig)))) throw new HttpError("invalid");
 }
 
 export function objectRoutes(
@@ -70,7 +75,7 @@ export function objectRoutes(
         if (existing.hash !== hash) throw new HttpError("conflict");
         return c.body(null, 200);
       }
-      checkObject(await group.claimed(), target, bytes, hash);
+      await checkObject(await group.claimed(), target, bytes, hash);
       if ((await meta.usage()).bytes + bytes.length > config.quota) throw new HttpError("quota");
       await blobs.put(hash, bytes);
       const result = await meta.putObject({
