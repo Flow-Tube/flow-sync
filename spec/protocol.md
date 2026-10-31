@@ -110,7 +110,7 @@ Each message is canonical JSON with a `type`, carried as a payload in a box.
 | 2 | M | `entry` | The `add` entry for N, signed by M except for `sigs[N]` |
 | 3 | N | `accept` | N's signature over that entry |
 | | M | | M appends the completed entry and N's wrap to the store |
-| 4 | M | `welcome` | `group`, `head` and `seq` (the roster head after the `add`), `link` (the link id of the member's synced profile, which the new device's Default profile joins), and `store`: for a Flow server `{"k":"server","u":url,"i":instance}`, for WebDAV `{"k":"webdav","u":url,"n":user,"w":password}`, for S3 `{"k":"s3","u":endpoint,"b":bucket,"g":region,"x":prefix,"y":"path" or "host","a":access key id,"s":secret}` (credentials travel only inside the pairing boxes and are stored in the platform keystore), for a [LAN group](live.md#lan-groups) `{"k":"lan"}`, with `entries` and `wrap` next to it |
+| 4 | M | `welcome` | `group`, `head` and `seq` (the roster head after the `add`), `link` (the link id of the member's active profile if it syncs, otherwise of the first profile it syncs; the new device's Default profile joins it), and `store`: for a Flow server `{"k":"server","u":url,"i":instance}`, for WebDAV `{"k":"webdav","u":url,"n":user,"w":password}`, for S3 `{"k":"s3","u":endpoint,"b":bucket,"g":region,"x":prefix,"y":"path" or "host","a":access key id,"s":secret}` (credentials travel only inside the pairing boxes and are stored in the platform keystore), for a [LAN group](live.md#lan-groups) `{"k":"lan"}`, with `entries` and `wrap` next to it |
 | 5 | N | `done` | N has verified the roster from genesis to that head, unwrapped `K_e` and checked `kc` |
 
 Over the LAN, `join` and `welcome` also carry `p`, the port of the sender's [LAN service](live.md#discovery). Each device remembers the other's address on the pairing connection with that `p`, so they can meet again where mDNS doesn't reach.
@@ -135,7 +135,7 @@ Any remaining device can remove one or more devices, including one that is lost:
 1. Generate `K_(e+1)`. Write a wrap for each remaining member, including the recovery member, and the history chain box.
 2. Append a `remove` entry with `epoch` `n = e + 1`, `kc` and `to`.
 3. The server revokes the removed devices' tokens on that append. On WebDAV and S3, the user should also revoke the removed device's credentials if it had its own.
-4. Write a new snapshot under `e + 1` for each link soon after, so new devices don't depend on older epochs.
+4. Soon after, write a new snapshot under `e + 1` for each link it can ([Snapshots](#snapshots)), so new devices don't depend on older epochs.
 
 Old objects are not re-encrypted: the removed device already had them. They leave through garbage collection.
 
@@ -148,7 +148,7 @@ A device can't sign its own `remove`, and must never hold the key of the epoch t
 1. The leaving device appends a `leave` entry signed by itself, with only its own `did` in `remove`. The last device of a group can't leave; it can only forget the group.
 2. The server revokes its tokens on that append. The device then deletes its device keys, the group's epoch keys and everything it stored for the group. On WebDAV and S3, the user should also revoke its credentials if it had its own.
 3. A device that sees a `leave` not yet followed by an entry that starts an epoch appends a `rotate` before it writes any new object: it generates `K_(e+1)`, writes a wrap for each current member, including the recovery member, and the history chain box, and appends `rotate` with `epoch` `n = e + 1`. Devices that rotate at the same time make a fork, resolved as above; a device whose `rotate` lost adopts the winner's epoch and doesn't rotate again.
-4. The device that rotated writes a new snapshot under `e + 1` for each link soon after, as after a removal.
+4. The device that rotated writes new snapshots under `e + 1` soon after, as after a removal.
 
 From its `leave` on, the device counts as removed everywhere in this document: its acks no longer hold back garbage collection, and any current device may delete its objects. To join again it pairs with new device keys, so it gets a new `did` and a new log.
 
@@ -162,7 +162,7 @@ To restore onto a new device, the user enters the words and the store location (
 2. Unwraps the latest `K_e` from the recovery member's wrap and checks `kc`.
 3. Creates fresh device keys, writes wraps of `K_(e+1)`, and appends a `restore` entry signed by the recovery key.
 4. Immediately creates a new recovery key, appends a `recovery` entry, and shows the new words.
-5. Reads every log, then links its profile like a `welcome` would: to the link that change batches and snapshot manifests name for profile data, or to its own profile id when they name none. It writes no batch before that. While profiles can't choose their links, a group has one; with several, the user picks.
+5. Reads every log, then links its Default profile like a `welcome` would. When change batches and snapshot manifests name one link for profile data, it joins that link; when they name none, it starts a link with its own profile id; when they name several, the user picks one from the `profiles` records, or starts a new link. It writes no batch before that.
 
 Every other device shows that the group was restored with the recovery key, and when.
 
@@ -179,7 +179,7 @@ A reader keeps, per sender, the last `seq` and hash it verified:
 - The next object must have `seq` + 1 and the matching `prev`.
 - An object at or below the last `seq` is a replay and is ignored. If its bytes differ from what was verified, the store is misbehaving and the device warns.
 - A gap means the store is withholding, or hasn't caught up. The reader waits; it doesn't skip.
-- A device that has never read a sender starts at its first object (`seq` 1, `prev` all zeros), or right after the sender's entry in the version vector of the snapshot it bootstraps from. A store therefore can't hide the beginning of a log.
+- A device that has never read a sender starts at its first object (`seq` 1, `prev` all zeros), or right after the sender's entry in the version vector of the snapshot it bootstraps from ([several links](#reading-a-link-from-its-snapshot)). A store therefore can't hide the beginning of a log.
 
 A device that sees the roster head, or any sender's `seq`, go backwards stops writing and warns that the store rolled back.
 
@@ -209,7 +209,14 @@ Group members go beyond FLOW-SYNC/1, on every transport: a `subscriptions` recor
 
 Each synced profile has a *link id*: the UUID of the profile that first published it. The `profiles` collection holds `{"link", "name", "hlc", "deleted"}` records, merged last-writer-wins by `hlc`.
 
-Each device keeps its own map from local profile to link id, and which links it syncs. Profiles that aren't selected never leave the device. Batches for a selected profile that isn't active are kept on the device and applied when that profile becomes active, because both apps run one profile at a time.
+A device writes a `profiles` record for each link it syncs that has none, and a new one when the user renames a linked profile. An empty `name` is a default profile that was never renamed, and apps show their own name for it.
+
+Each device keeps its own map from local profile to link id; a link maps to at most one local profile. Profiles that aren't linked never leave the device. A device in a group keeps at least one profile linked.
+
+- **Linking.** A local profile either starts a link with its own id, or joins a link listed in `profiles`, and its local data then merges with the link's. A device can also create a local profile for a link it doesn't sync yet. A profile that joins a link [reads it from its snapshot](#reading-a-link-from-its-snapshot) before it sends batches for that link.
+- **Inactive profiles.** Both apps run one profile at a time. Batches for a linked profile that isn't active are kept on the device and count as consumed. When that profile becomes active, the device applies them in the order it read them, one transaction per batch, before it sends anything for that link.
+- **Unlinking.** A device that stops syncing a profile removes it from its map and keeps its local data. It skips that link's later batches.
+- **Deleting.** A record with `deleted: true` retires the link for every device: each unlinks its profile and keeps the local data. Its batches no longer hold back [garbage collection](#garbage-collection), so a profile linked to it again starts from what the store still holds. A device that a delete leaves with no linked profile adds no devices until the user links one.
 
 ### Snapshots
 
@@ -221,18 +228,22 @@ A snapshot holds the merged state of one link (or of `profiles`) as blobs, plus 
 
 `vv` is the version vector the state includes: for each sender, the last `seq` merged and the SHA-256 of that object. Merges are state-based, so any device's snapshot is valid, and a new device can start from any snapshot and then read each log after `vv`. The first object it reads from sender X must have `seq` = `vv[X].seq` + 1 and `prev` = `vv[X].hash`, so the chain still holds once older objects are deleted.
 
-A device SHOULD write a snapshot for a link when it has merged more than 1 MiB of batches since the last snapshot of that link, when the last one is 7 days old, and after starting an epoch with `remove` or `rotate`.
+A device writes snapshots only of `profiles` and of the link of its active profile, once every batch it keeps for that link is applied; its state then includes everything its `vv` names. It SHOULD write one when it has merged more than 1 MiB of batches since the last snapshot of that link, when the last one is 7 days old, and after starting an epoch with `remove` or `rotate`.
+
+#### Reading a link from its snapshot
+
+A device starts reading a link when it bootstraps, and when it links a profile to a link it hasn't been reading. It takes the newest snapshot of that link it can open, then reads each sender's log from that snapshot's `vv` and applies only that link's batches, up to where it had already read. A link with no snapshot is read from each log's first object. Bootstrapping several links at once, a device reads each log from the lowest `vv` entry among their snapshots and skips a link's batches that its own snapshot already includes. [Garbage collection](#garbage-collection) keeps every object that a link's snapshots don't cover, so these are still in the store.
 
 ### Acknowledgements
 
-After applying, a device appends an ack: `{"vv":{"<did>":seq}}`, the last `seq` of every other sender it has consumed. A batch skipped on purpose (an unselected link) counts as consumed. A device has always read its own log, so its acks leave itself out. Acks aren't acknowledged: a device writes one only after consuming batches or snapshot manifests, and its next ack covers any acks it read before.
+After applying, a device appends an ack: `{"vv":{"<did>":seq}}`, the last `seq` of every other sender it has consumed. A batch skipped on purpose (a link the device doesn't sync), or kept for a profile that isn't active, counts as consumed. A device has always read its own log, so its acks leave itself out. Acks aren't acknowledged: a device writes one only after consuming batches or snapshot manifests, and its next ack covers any acks it read before.
 
 ### Garbage collection
 
 An object of sender X at `seq` n MAY be deleted when:
 
 - every current device other than X has a latest ack with `vv[X] ≥ n`, and
-- for every link that batches name, and for `profiles` once a device writes it, a snapshot that every current device has acked has `vv[X].seq ≥ n`. A device has acked a snapshot when its latest ack covers the manifest's `seq` in its writer's log.
+- for every link that batches name, except links whose `profiles` record is deleted, and for `profiles` once a device writes it, a snapshot that every current device has acked has `vv[X].seq ≥ n`. A device has acked a snapshot when its latest ack covers the manifest's `seq` in its writer's log.
 
 A snapshot manifest and its blobs MAY be deleted when a newer snapshot of the same link has a version vector at least as large for every sender, every current device has acked that newer snapshot, and every current device's latest ack has `vv[X] ≥ n` for the manifest's own `seq` n, so no reader meets the gap it leaves. Removed devices don't count.
 
