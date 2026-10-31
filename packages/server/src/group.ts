@@ -1,16 +1,19 @@
 import {
-  applyEntry,
   canonical,
+  checkEntry,
   type Entry,
+  fail,
   fromB64,
   fromHex,
   type Json,
   parseEntry,
   type RosterState,
   randomBytes,
+  type SignatureCheck,
   toHex,
   WRAP_SIZE,
 } from "@flow-sync/protocol";
+import { verifyAll } from "./crypto.ts";
 import { HttpError } from "./http/errors.ts";
 import { LIMITS } from "./limits.ts";
 import type { MetaStore, RosterAppend } from "./storage/types.ts";
@@ -63,6 +66,22 @@ function epochKeys(
   return keys;
 }
 
+async function verified(signatures: SignatureCheck[]): Promise<void> {
+  if (!(await verifyAll(signatures))) fail("roster-signature");
+}
+
+/** Applies entries in order, checking all their signatures together. */
+async function applyAll(state: RosterState | undefined, entries: Entry[]) {
+  const signatures: SignatureCheck[] = [];
+  for (const entry of entries) {
+    const checked = checkEntry(state, entry);
+    state = checked.state;
+    signatures.push(...checked.signatures);
+  }
+  await verified(signatures);
+  return state;
+}
+
 /** The instance identity and the group's roster, shared by every route. */
 export class Group {
   readonly #meta: MetaStore;
@@ -99,10 +118,11 @@ export class Group {
         this.forget();
         continue;
       }
-      for (const json of entries) {
-        this.#state = applyEntry(this.#state, parseEntry(JSON.parse(json)));
-        this.#head = json;
-      }
+      this.#state = await applyAll(
+        this.#state,
+        entries.map((json) => parseEntry(JSON.parse(json))),
+      );
+      this.#head = entries.at(-1) ?? this.#head;
       if (!full) return this.#state;
     }
   }
@@ -118,7 +138,8 @@ export class Group {
     const json = canonical(entry as Json);
     if (json.length > LIMITS.rosterEntry) throw new HttpError("too_large");
     const before = await this.roster();
-    const after = applyEntry(before, entry);
+    const { state: after, signatures } = checkEntry(before, entry);
+    await verified(signatures);
     const appended = await this.#meta.appendRoster({
       seq: entry.seq,
       prev: before?.head,

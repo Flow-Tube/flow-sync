@@ -18,6 +18,13 @@ export function sign(seed: Uint8Array, message: Uint8Array): Uint8Array {
   return ed25519.sign(message, seed);
 }
 
+/** A signature check, for callers that run it with another Ed25519 implementation. */
+export interface SignatureCheck {
+  key: Uint8Array;
+  message: Uint8Array;
+  signature: Uint8Array;
+}
+
 export function verify(publicKey: Uint8Array, message: Uint8Array, signature: Uint8Array): boolean {
   return (
     isValidSigningKey(publicKey) && ed25519.verify(signature, message, publicKey, { zip215: false })

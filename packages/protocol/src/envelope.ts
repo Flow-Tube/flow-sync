@@ -1,6 +1,6 @@
 import { BOX_OVERHEAD, open, seal } from "./box.ts";
 import { concat, equalBytes, readU32, readU64, u8, u32, u64 } from "./bytes.ts";
-import { sign, verify } from "./curve.ts";
+import { type SignatureCheck, sign, verify } from "./curve.ts";
 import type { Purpose } from "./epoch.ts";
 import { fail } from "./errors.ts";
 import { sha256, tag } from "./kdf.ts";
@@ -93,9 +93,14 @@ export function parseObject(bytes: Uint8Array, group: Uint8Array): ParsedObject 
   };
 }
 
-export function verifyObject(object: ParsedObject, sigPublic: Uint8Array): void {
+export function objectSignature(object: ParsedObject, sigPublic: Uint8Array): SignatureCheck {
   const message = signedBytes(object.headerBytes, object.box);
-  if (!verify(sigPublic, message, object.signature)) fail("signature");
+  return { key: sigPublic, message, signature: object.signature };
+}
+
+export function verifyObject(object: ParsedObject, sigPublic: Uint8Array): void {
+  const { key, message, signature } = objectSignature(object, sigPublic);
+  if (!verify(key, message, signature)) fail("signature");
 }
 
 export function openObject(object: ParsedObject, purposeKey: Uint8Array): Uint8Array {
