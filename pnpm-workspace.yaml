@@ -3,10 +3,11 @@ packages:
 
 minimumReleaseAge: 4320
 
-# None of these install scripts is needed: esbuild ships its binary as an optional dependency,
-# and the others build optional native speedups for Testcontainers' dependencies.
+# None of these install scripts is needed: esbuild and workerd ship their binaries as optional
+# dependencies, and the others build optional native speedups for Testcontainers' dependencies.
 allowBuilds:
   cpu-features: false
   esbuild: false
   protobufjs: false
   ssh2: false
+  workerd: false

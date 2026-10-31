@@ -1,8 +1,9 @@
 import { concat, fromB64, fromHex, sign, tag, toB64, toHex } from "@flow-sync/protocol";
 import { describe, expect, test } from "vitest";
 import { LIMITS } from "../limits.ts";
-import { bearer, claimedApp, postJson, testApp } from "../testing/app.ts";
+import { claimedApp, testApp } from "../testing/app.ts";
 import { newDevice, signIn } from "../testing/group.ts";
+import { bearer, postJson } from "../testing/http.ts";
 
 type Challenge = { challenge: string; instance: string; group: string; time: number };
 

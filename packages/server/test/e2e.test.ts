@@ -17,7 +17,8 @@ import {
   wrapEpochKey,
 } from "@flow-sync/protocol";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { ADMIN_TOKEN, testApp } from "../src/testing/app.ts";
+import { testApp } from "../src/testing/app.ts";
+import { ADMIN_TOKEN } from "../src/testing/http.ts";
 import { closeServers, serveLive } from "../src/testing/live.ts";
 import { SimDevice } from "./device.ts";
 import { pairThroughMailbox } from "./pairing.ts";

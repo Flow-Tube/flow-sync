@@ -11,10 +11,10 @@ import {
   toHex,
   wrapEpochKey,
 } from "@flow-sync/protocol";
-import { bearer, type claimedApp, postJson } from "./app.ts";
-import { newDevice } from "./group.ts";
+import { type App, type genesis, newDevice } from "./group.ts";
+import { bearer, postJson } from "./http.ts";
 
-export type Harness = Awaited<ReturnType<typeof claimedApp>>;
+export type Harness = { app: App } & Awaited<ReturnType<typeof genesis>>;
 
 export async function entries(h: Harness, token: string, after = -1) {
   const res = await h.app.request(`/v1/roster?after=${after}`, bearer(token));

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { ADMIN_TOKEN, postJson, testApp } from "../testing/app.ts";
+import { testApp } from "../testing/app.ts";
+import { ADMIN_TOKEN, postJson } from "../testing/http.ts";
 
 const adminJson = (body: unknown, token = ADMIN_TOKEN) => postJson(body, token);
 

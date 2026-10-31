@@ -103,8 +103,10 @@ export class LiveHub {
 
   /** Closes connections whose token expired or whose device was removed. */
   async sweep(): Promise<void> {
+    const connections = this.#connections.list();
+    if (!connections.length) return;
     const state = await this.#group.roster();
-    for (const connection of this.#connections.list()) {
+    for (const connection of connections) {
       if (!state?.members.has(connection.did) || connection.expires <= this.#now()) {
         this.#close(connection, POLICY_VIOLATION);
       }

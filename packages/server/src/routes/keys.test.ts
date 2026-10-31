@@ -1,7 +1,8 @@
 import { toB64, toHex } from "@flow-sync/protocol";
 import { describe, expect, test } from "vitest";
-import { bearer, claimedApp } from "../testing/app.ts";
+import { claimedApp } from "../testing/app.ts";
 import { signIn } from "../testing/group.ts";
+import { bearer } from "../testing/http.ts";
 import { addDevice, append, removal } from "../testing/roster.ts";
 
 describe("keys", () => {

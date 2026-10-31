@@ -18,6 +18,7 @@ import type { AppEnv } from "../env.ts";
 import { limitBody, octets, readBytes } from "../http/body.ts";
 import { HttpError } from "../http/errors.ts";
 import { LIMITS } from "../limits.ts";
+import type { Stored } from "../live/relay.ts";
 import type { BlobStore } from "../storage/types.ts";
 
 const PREFIX = "/v1/objects/";
@@ -53,7 +54,7 @@ function checkObject(state: RosterState, target: DevicePath, bytes: Uint8Array, 
 }
 
 export function objectRoutes(
-  deps: AuthDeps & { blobs: BlobStore; stored: (did: string) => void },
+  deps: AuthDeps & { blobs: BlobStore; stored: Stored },
   config: Config,
 ) {
   const { meta, blobs, group } = deps;
@@ -82,7 +83,7 @@ export function objectRoutes(
         if (!(await meta.isHashUsed(hash))) await blobs.delete(hash);
         throw new HttpError("conflict");
       }
-      if (result === "created") deps.stored(target.did);
+      if (result === "created") await deps.stored(target.did);
       return c.body(null, result === "created" ? 201 : 200);
     })
     .get(`${PREFIX}*`, member, async (c) => {

@@ -1,0 +1,22 @@
+# Deploy from the repository root: npx wrangler deploy -c deploy/cloudflare/wrangler.toml
+name = "flow-sync"
+main = "../../packages/server/src/entry/workers.ts"
+compatibility_date = "2026-10-01"
+
+# Without ids, wrangler creates the database and the bucket on the first deploy.
+[[d1_databases]]
+binding = "DB"
+database_name = "flow-sync"
+
+[[r2_buckets]]
+binding = "BLOBS"
+bucket_name = "flow-sync"
+
+[[durable_objects.bindings]]
+name = "LIVE"
+class_name = "LiveRoom"
+
+# The Workers Free plan only runs SQLite-backed Durable Objects.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LiveRoom"]
