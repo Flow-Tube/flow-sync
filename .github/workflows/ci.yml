@@ -28,7 +28,37 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm typecheck
+      # Node, workerd (Workers) and the Postgres and S3 container suites, which must not skip here.
       - run: pnpm test
+        env:
+          FLOW_SYNC_REQUIRE_DOCKER: "1"
+
+  bundles:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Node
+        run: pnpm --filter @flow-sync/server build
+      - name: Cloudflare Workers
+        run: pnpm --filter @flow-sync/server exec wrangler deploy --dry-run -c ../../deploy/cloudflare/wrangler.toml --outdir "$RUNNER_TEMP/workers"
+        env:
+          WRANGLER_SEND_METRICS: "false"
+      - name: Vercel and Netlify functions
+        working-directory: packages/server
+        run: |
+          for entry in vercel netlify; do
+            pnpm exec esbuild "src/entry/$entry.ts" --bundle --platform=node --target=node24 \
+              --format=esm --outfile="$RUNNER_TEMP/$entry.mjs" --log-level=warning
+          done
 
   links:
     runs-on: ubuntu-24.04
@@ -45,6 +75,13 @@ jobs:
   image:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 2s --health-retries 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -64,3 +101,11 @@ jobs:
           for _ in $(seq 1 30); do curl -fsS localhost:8080/v1/health && break; sleep 1; done
           curl -fsS localhost:8080/v1/info | grep -q '"claimed":false'
           test "$(docker inspect -f '{{.Config.User}}' flow-sync)" = "65532:65532"
+      - name: Run the image hardened on Postgres and check it answers
+        run: |
+          docker run -d --name flow-sync-pg --network host --read-only --tmpfs /tmp --cap-drop ALL \
+            --security-opt no-new-privileges:true -e PORT=8081 \
+            -e DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/postgres \
+            -e FLOW_SYNC_ADMIN_TOKEN="$(openssl rand -hex 24)" flow-sync:ci
+          for _ in $(seq 1 30); do curl -fsS localhost:8081/v1/health && break; sleep 1; done
+          curl -fsS localhost:8081/v1/info | grep -q '"claimed":false'
