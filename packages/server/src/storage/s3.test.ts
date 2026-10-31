@@ -13,16 +13,8 @@ const S3_PORT = 8333;
 
 if (await hasDocker()) {
   let container: StartedTestContainer;
-  let buckets = 0;
-
-  beforeAll(async () => {
-    container = await new GenericContainer(IMAGE)
-      .withCommand(["server", "-s3", "-dir=/data"])
-      .withExposedPorts(S3_PORT)
-      .withWaitStrategy(Wait.forListeningPorts())
-      .start();
-  }, 120_000);
-  afterAll(() => container.stop());
+  // One bucket for the suite: SeaweedFS gives every bucket its own volumes, which run out.
+  const bucket = "flow-sync-test";
 
   const client = () =>
     s3Client({
@@ -32,19 +24,33 @@ if (await hasDocker()) {
       forcePathStyle: true,
     });
 
-  async function freshBucket(): Promise<string> {
-    const bucket = `test-${++buckets}`;
+  beforeAll(async () => {
+    container = await new GenericContainer(IMAGE)
+      .withCommand(["server", "-s3", "-dir=/data"])
+      .withExposedPorts(S3_PORT)
+      .withWaitStrategy(Wait.forListeningPorts())
+      .start();
     await client().send(new CreateBucketCommand({ Bucket: bucket }));
-    return bucket;
-  }
+    // The port opens before the store has volumes to write to.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await client().send(new PutObjectCommand({ Bucket: bucket, Key: "ready", Body: "1" }));
+        return;
+      } catch (error) {
+        if (attempt === 60) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+  }, 120_000);
+  afterAll(() => container.stop());
 
-  storageContract("sqlite + s3", async () => ({
-    meta: openSqlite(":memory:").meta,
-    blobs: openS3Blobs(client(), await freshBucket()),
-  }));
+  storageContract("sqlite + s3", async () => {
+    const blobs = openS3Blobs(client(), bucket);
+    await blobs.clear();
+    return { meta: openSqlite(":memory:").meta, blobs };
+  });
 
   test("clearing leaves other objects in a shared bucket alone", async () => {
-    const bucket = await freshBucket();
     await client().send(new PutObjectCommand({ Bucket: bucket, Key: "other", Body: "keep" }));
     const blobs = openS3Blobs(client(), bucket);
     await blobs.put("a", Uint8Array.of(1));

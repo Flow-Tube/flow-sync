@@ -60,7 +60,11 @@ const bytes = (value: unknown) => {
 };
 
 export function postgresPool(connectionString: string): pg.Pool {
-  return new pg.Pool({ connectionString, types });
+  const pool = new pg.Pool({ connectionString, types });
+  // An idle client lost its connection: the pool drops it, and the next query reports a lasting
+  // failure. Unhandled, the event would stop the process.
+  pool.on("error", () => {});
+  return pool;
 }
 
 /** Creates the tables on first use; the pool belongs to the caller. */
