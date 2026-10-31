@@ -1,0 +1,7 @@
+# Set the site's base directory to the repository root and its package directory to deploy/netlify.
+[build]
+  command = "pnpm install --frozen-lockfile"
+
+[functions]
+  directory = "deploy/netlify/functions"
+  node_bundler = "esbuild"
