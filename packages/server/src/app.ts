@@ -61,7 +61,7 @@ export function createApp(deps: AppDeps) {
   const hub = new LiveHub(group, deps.now);
   const stored = (did: string) => hub.changed(did);
   app.route("/", claimRoutes(deps.config, group, guards));
-  app.route("/", adminRoutes(deps.config, group, deps.storage.meta, guards));
+  app.route("/", adminRoutes(deps.config, group, deps.storage, guards));
   app.route("/", authRoutes(members));
   app.route("/", rosterRoutes({ ...members, stored }));
   app.route("/", keyRoutes(members));

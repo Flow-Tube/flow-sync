@@ -7,11 +7,16 @@ import { type Group, INSTANCE_SETTINGS } from "../group.ts";
 import { limitBody, readJson } from "../http/body.ts";
 import type { Guards } from "../limits/guards.ts";
 import { LIMITS } from "../limits.ts";
-import type { MetaStore } from "../storage/types.ts";
+import type { Storage } from "../storage/types.ts";
 
 const resetSchema = z.strictObject({ confirm: z.literal("reset") });
 
-export function adminRoutes(config: Config, group: Group, meta: MetaStore, guards: Guards) {
+export function adminRoutes(
+  config: Config,
+  group: Group,
+  { meta, blobs }: Storage,
+  guards: Guards,
+) {
   return new Hono<AppEnv>()
     .use("/v1/admin/*", requireAdmin(config, guards))
     .get("/v1/admin/usage", async (c) => {
@@ -32,6 +37,7 @@ export function adminRoutes(config: Config, group: Group, meta: MetaStore, guard
       await readJson(c, resetSchema);
       await meta.reset(INSTANCE_SETTINGS);
       group.forget();
+      await blobs.clear();
       return c.body(null, 204);
     });
 }

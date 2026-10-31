@@ -157,11 +157,11 @@ export function storageContract(name: string, open: () => Promise<Storage> | Sto
       await store.meta.putObject(record("p1", "a"));
       await store.blobs.put("a", bytes(1));
       await store.meta.reset(["instance"]);
+      expect(await store.blobs.get("a")).toEqual(bytes(1));
       expect(await store.meta.getSetting("instance")).toBe("i");
       expect(await store.meta.getSetting("group")).toBeUndefined();
       expect(await store.meta.rosterAfter(-1, 10)).toEqual([]);
       expect(await store.meta.usage()).toEqual({ bytes: 0, objects: 0 });
-      expect(await store.blobs.get("a")).toBeUndefined();
     });
 
     test("blobs are stored by hash", async () => {
@@ -170,6 +170,14 @@ export function storageContract(name: string, open: () => Promise<Storage> | Sto
       expect(await store.blobs.get("a")).toEqual(bytes(1, 2, 3));
       await store.blobs.delete("a");
       expect(await store.blobs.get("a")).toBeUndefined();
+    });
+
+    test("clearing blobs deletes every one", async () => {
+      await store.blobs.put("a", bytes(1));
+      await store.blobs.put("b", bytes(2));
+      await store.blobs.clear();
+      expect(await store.blobs.get("a")).toBeUndefined();
+      expect(await store.blobs.get("b")).toBeUndefined();
     });
   });
 }
