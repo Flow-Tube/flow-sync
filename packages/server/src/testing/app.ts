@@ -8,11 +8,10 @@ import { genesis } from "./group.ts";
 export const ADMIN_TOKEN = "admin-token-for-tests-0123456789abcdef";
 
 /** An app wired for tests, with a controllable clock and captured logs. */
-export function testApp(overrides: Partial<Config> = {}) {
+export function testApp(overrides: Partial<Config> = {}, storage = openSqlite(":memory:")) {
   const logs: LogLine[] = [];
   const clock = { now: 1_793_232_000_000 };
   const config = { ...loadConfig({ FLOW_SYNC_ADMIN_TOKEN: ADMIN_TOKEN }, true), ...overrides };
-  const storage = openSqlite(":memory:");
   const { app, hub } = createApp({
     config,
     storage,

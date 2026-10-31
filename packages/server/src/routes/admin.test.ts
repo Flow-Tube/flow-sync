@@ -1,7 +1,7 @@
 import { sha256, toHex } from "@flow-sync/protocol";
 import { describe, expect, test } from "vitest";
 import { ADMIN_TOKEN, bearer, claimedApp, postJson, testApp } from "../testing/app.ts";
-import { signIn } from "../testing/group.ts";
+import { genesis, signIn } from "../testing/group.ts";
 import { objectUrl, putBytes, sealedObject } from "../testing/objects.ts";
 
 describe("admin", () => {
@@ -39,6 +39,19 @@ describe("admin", () => {
       postJson({ entry: h.entry, wraps: h.wraps }, ADMIN_TOKEN),
     );
     expect(claim.status).toBe(201);
+  });
+
+  test("an instance sharing the store sees a reset and a new group made through another", async () => {
+    const h = await claimedApp();
+    const other = testApp({}, h.storage);
+    await signIn(other.app, h.device, h.group);
+    await h.app.request("/v1/admin/reset", postJson({ confirm: "reset" }, ADMIN_TOKEN));
+    const next = await genesis();
+    await h.app.request(
+      "/v1/claim",
+      postJson({ entry: next.entry, wraps: next.wraps }, ADMIN_TOKEN),
+    );
+    await expect(signIn(other.app, next.device, next.group)).resolves.toBeTypeOf("string");
   });
 
   test("admin routes are closed when admin access is off", async () => {
