@@ -10,7 +10,7 @@ The payload content is canonical JSON:
 |---|---|---|
 | `presence` | `can`: list of `play`, `remote`; `kind`: `phone`, `tablet`, `tv` or `desktop` | The sender is online, what it accepts, and which icon shows it |
 | `now` | `video`, `title`, `by` (channel or artist), `music` (bool), `link` (link id or `null`), `pos` (ms), `dur` (ms), `state` (`playing` or `paused`), `vol` (0 to 100), `queue` (video ids, at most 50), `index` (the video's place in `queue`) | What the sender is playing; `video` is `null` when nothing is loaded |
-| `play` | `to`, `video`, `pos` (ms), `music` (bool), `link` (link id or `null`), `queue` (video ids, at most 50), `index`, `state` (`playing` or `paused`) | Hand the sender's session to device `to`: the same queue and place, from that position, in the linked profile |
+| `play` | `to`, `video`, `pos` (ms), `music` (bool), `link` (link id or `null`), `queue` (video ids, at most 50), `index`, `state` (`playing` or `paused`) | Hand the sender's session to device `to`: the same queue and place, from that position, in the linked profile, or in the active profile when the target doesn't run that link |
 | `cmd` | `to`, `cmd` (`play`, `pause`, `seek`, `next`, `previous`, `volume`, `queue`), and `pos`, `vol` or `queue` as the command needs | Control playback on device `to` |
 | `result` | `to`, `ref` (the counter of the message answered), `ok` (bool), `reason` | The outcome of `play` or `cmd` |
 
