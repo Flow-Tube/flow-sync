@@ -1,0 +1,11 @@
+# Both reach the lockfile only through Testcontainers' archiver, a dev dependency used by the
+# container test suites. Neither has a fix in the major versions archiver uses.
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2026-12-01T00:00:00Z
+reason = "glob 10 via testcontainers > archiver (dev only); no fix before glob 14"
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2026-12-01T00:00:00Z
+reason = "minimatch 5 and 9 via testcontainers > archiver (dev only); no fix before minimatch 11"
