@@ -1,13 +1,12 @@
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
-import type { UpgradeWebSocket } from "hono/ws";
 import type { Config } from "./config.ts";
 import type { AppEnv } from "./env.ts";
 import { Group } from "./group.ts";
 import { errorCode, errorResponse, HttpError } from "./http/errors.ts";
 import { type Logger, requestLog } from "./http/log.ts";
 import { type ClientIp, createGuards, guardRequests } from "./limits/guards.ts";
-import { LiveHub } from "./live/hub.ts";
+import type { LiveFactory, LiveRelay } from "./live/relay.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { claimRoutes } from "./routes/claim.ts";
@@ -21,17 +20,17 @@ import { rosterRoutes } from "./routes/roster.ts";
 import { statusRoutes } from "./routes/status.ts";
 import type { Storage } from "./storage/types.ts";
 
-export interface AppDeps {
+export interface AppDeps<L extends LiveRelay> {
   config: Config;
   storage: Storage;
   log: Logger;
   now: () => number;
   clientIp: ClientIp;
   /** Absent on hosts that can't hold connections open; live features are then off. */
-  upgradeWebSocket?: UpgradeWebSocket;
+  live?: LiveFactory<L>;
 }
 
-export function createApp(deps: AppDeps) {
+export function createApp<L extends LiveRelay>(deps: AppDeps<L>) {
   const app = new Hono<AppEnv>();
   app.use(requestLog(deps.log, deps.now));
   app.use(
@@ -58,8 +57,8 @@ export function createApp(deps: AppDeps) {
   const group = new Group(deps.storage.meta);
   app.route("/", metaRoutes(deps.config, group));
   const members = { group, meta: deps.storage.meta, now: deps.now, guards };
-  const hub = new LiveHub(group, deps.now);
-  const stored = (did: string) => hub.changed(did);
+  const relay = deps.live?.(group, deps.now);
+  const stored = (did: string) => relay?.changed(did);
   app.route("/", claimRoutes(deps.config, group, guards));
   app.route("/", adminRoutes(deps.config, group, deps.storage, guards));
   app.route("/", authRoutes(members));
@@ -69,6 +68,6 @@ export function createApp(deps: AppDeps) {
   app.route("/", pairRoutes(members));
   app.route("/", joinRoutes(members, deps.config, guards));
   app.route("/", statusRoutes(members, deps.config));
-  if (deps.upgradeWebSocket) app.route("/", liveRoutes(members, hub, deps.upgradeWebSocket));
-  return { app, hub };
+  if (relay) app.route("/", liveRoutes(members, relay));
+  return { app, relay };
 }

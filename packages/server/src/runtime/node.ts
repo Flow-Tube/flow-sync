@@ -1,15 +1,16 @@
 import type { AddressInfo } from "node:net";
 import { serve, upgradeWebSocket, type WebSocketServerLike } from "@hono/node-server";
 import { getConnInfo } from "@hono/node-server/conninfo";
-import type { Context } from "hono";
+import type { Context, Hono } from "hono";
 import { WebSocketServer } from "ws";
-import type { createApp } from "../app.ts";
+import type { AppEnv } from "../env.ts";
 import { LIMITS } from "../limits.ts";
+import { processLive } from "../live/node.ts";
 import { LIVE_PROTOCOL } from "../routes/live.ts";
 
 const SWEEP_MS = 15_000;
 
-export { upgradeWebSocket };
+export const nodeLive = processLive(upgradeWebSocket);
 
 /** Behind a trusted proxy (Caddy), the last X-Forwarded-For hop is the one the proxy added. */
 export function clientIp(trustProxy: boolean) {
@@ -20,7 +21,7 @@ export function clientIp(trustProxy: boolean) {
 }
 
 export function listen(
-  { app, hub }: ReturnType<typeof createApp>,
+  { app, relay }: { app: Hono<AppEnv>; relay: { sweep(): Promise<void> } | undefined },
   port: number,
   onListening?: (info: AddressInfo) => void,
 ) {
@@ -29,7 +30,7 @@ export function listen(
     maxPayload: LIMITS.liveMessage,
     handleProtocols: (protocols) => (protocols.has(LIVE_PROTOCOL) ? LIVE_PROTOCOL : false),
   });
-  const sweep = setInterval(() => void hub.sweep(), SWEEP_MS);
+  const sweep = setInterval(() => void relay?.sweep(), SWEEP_MS);
   sweep.unref();
   const http = serve(
     {
