@@ -9,11 +9,12 @@ From the repository root, with a Cloudflare account:
 ```sh
 pnpm install --frozen-lockfile
 npx wrangler login
-openssl rand -hex 32 | npx wrangler secret put FLOW_SYNC_ADMIN_TOKEN -c deploy/cloudflare/wrangler.toml
+npx wrangler r2 bucket create flow-sync
 npx wrangler deploy -c deploy/cloudflare/wrangler.toml
+openssl rand -hex 32 | tee /dev/stderr | npx wrangler secret put FLOW_SYNC_ADMIN_TOKEN -c deploy/cloudflare/wrangler.toml
 ```
 
-The first deploy creates the D1 database and the R2 bucket. Add a custom domain in the dashboard if you don't want the `workers.dev` address.
+The deploy creates the D1 database, but not the R2 bucket, which the config names. If R2 isn't enabled on the account yet, enable it once in the dashboard; Cloudflare may ask for a payment method even for the free tier. The last command prints the admin token; keep it to claim the instance from Flow. The first deploy also offers to register a `workers.dev` subdomain; add a custom domain in the dashboard if you'd rather use your own.
 
 ## Limits on the Free plan
 

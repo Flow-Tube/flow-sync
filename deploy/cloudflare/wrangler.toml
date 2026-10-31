@@ -3,7 +3,8 @@ name = "flow-sync"
 main = "../../packages/server/src/entry/workers.ts"
 compatibility_date = "2026-10-01"
 
-# Without ids, wrangler creates the database and the bucket on the first deploy.
+# Without an id, wrangler creates the database on the first deploy. Create the bucket first:
+#   npx wrangler r2 bucket create flow-sync
 [[d1_databases]]
 binding = "DB"
 database_name = "flow-sync"
