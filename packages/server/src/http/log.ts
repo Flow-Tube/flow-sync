@@ -10,6 +10,7 @@ export function requestLog(log: Logger, now: () => number): MiddlewareHandler<Ap
     const start = now();
     await next();
     const line: LogLine = {
+      time: new Date(start).toISOString(),
       method: c.req.method,
       route: c.req.routePath,
       status: c.res.status,
@@ -18,6 +19,8 @@ export function requestLog(log: Logger, now: () => number): MiddlewareHandler<Ap
     const size = c.req.header("content-length");
     if (size) line.bytes = Number(size);
     if (c.res.status >= 400) line.error = c.get("errorCode") ?? "unknown";
+    const name = c.get("errorName");
+    if (name) line.cause = name;
     log(line);
   };
 }
