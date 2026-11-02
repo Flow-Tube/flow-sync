@@ -15,7 +15,7 @@ The same server runs on every host below. Pick one, follow its guide, then claim
 
 Without live features, the apps hide "Play on" and remote control unless the devices share a network.
 
-Only the Docker image is built and run in CI. The other templates are tested against local emulators where one exists, but none has been deployed to its host by the project yet. Each guide says what that means for it.
+The Docker image is built and run in CI. Cloudflare Workers, Vercel and Netlify were deployed by the maintainer on 31 October 2026 and work. Heroku, Railway, Render and Fly.io are templates tested against the same image, but haven't been deployed to their hosts yet. Each guide says what was verified.
 
 Settings shared by every host (admin token, quota, security contact) are listed in the [Docker guide](../deploy/docker/README.md#settings).
 

@@ -25,6 +25,6 @@ The deploy creates the D1 database, but not the R2 bucket, which the config name
 
 The Workers Paid plan ($5/month) raises all of these.
 
-## Not verified
+## Verified
 
-The Worker, D1, R2 and the Durable Object are tested locally in workerd (Miniflare) and bundled with `wrangler deploy --dry-run`. Nothing has been deployed to Cloudflare by the project yet, and CPU was measured in Node, not on Cloudflare.
+The Worker, D1, R2 and the Durable Object are tested locally in workerd (Miniflare) and bundled with `wrangler deploy --dry-run` in CI. The maintainer deployed it on 31 October 2026 and has synced Flow for Android and Flow Desktop through it since. CPU was measured in Node, not on Cloudflare.
