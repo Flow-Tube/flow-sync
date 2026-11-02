@@ -13,6 +13,6 @@ Metadata in Netlify Database (Postgres) and object bytes in Netlify Blobs with s
 - Buffered function bodies are capped at 6 MB, and binary bodies travel base64-encoded, about 4.5 MB of bytes. The server's largest object is 4 MiB, about 5.6 MB encoded, so it fits.
 - When the free credits run out, every project on the account pauses until the next cycle.
 
-## Not verified
+## Verified
 
-The Blobs adapter passes the storage tests against Netlify's own local Blobs server, and the entry answers requests in tests. The project hasn't deployed to Netlify yet, and the base and package directory setup is untested.
+The Blobs adapter passes the storage tests against Netlify's own local Blobs server, and the entry answers requests in tests. The maintainer deployed it with the steps above on 31 October 2026, and it worked.
