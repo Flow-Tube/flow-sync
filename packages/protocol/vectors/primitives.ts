@@ -17,7 +17,9 @@ import { device, flip, group, hex, rand, type Vectors } from "./fixtures.ts";
 
 export function canonicalVectors(): Vectors {
   const input = { b: [3, { z: true, a: null }], a: 'é\n"', ab: -1, "": 0 };
-  return { cases: [{ input, canonical: canonical(input) }] };
+  // By UTF-16 unit U+1F600 sorts before U+E000, though its code point is higher.
+  const beyondBmp = { "\u{1F600}": 1, "\uE000": 2, z: 3 };
+  return { cases: [input, beyondBmp].map((i) => ({ input: i, canonical: canonical(i) })) };
 }
 
 export function deriveVectors(): Vectors {

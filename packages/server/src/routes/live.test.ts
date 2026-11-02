@@ -1,4 +1,6 @@
 import { ObjectType, toHex } from "@flow-sync/protocol";
+import { fuzzRuns, mutations } from "@flow-sync/protocol/testing";
+import fc from "fast-check";
 import { afterEach, describe, expect, test } from "vitest";
 import { claimedApp } from "../testing/app.ts";
 import { signIn } from "../testing/group.ts";
@@ -56,6 +58,28 @@ describe("live relay", () => {
   test("a connection needs a valid token", async () => {
     const h = await setup();
     await expect(connect(h.port, "invalid")).rejects.toThrow();
+  });
+
+  test("any change to a live message closes the sender and reaches no one", async () => {
+    const h = await setup();
+    const b = await connect(h.port, h.tokenB);
+    await b.next();
+    await fc.assert(
+      fc.asyncProperty(mutations(h.live()), async (changed) => {
+        // Stays under the per-address connection rate and the per-device message rate.
+        h.clock.now += 600;
+        const a = await connect(h.port, h.tokenA);
+        a.socket.send(changed);
+        expect(await a.closed).toBe(1008);
+      }),
+      fuzzRuns(30),
+    );
+    const a = await connect(h.port, h.tokenA);
+    const message = h.live();
+    a.socket.send(message);
+    let next = await b.next();
+    while (typeof next === "string") next = await b.next();
+    expect(next).toEqual(message);
   });
 
   test("text frames and messages that fail the reader's checks close the sender", async () => {

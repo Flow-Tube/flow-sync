@@ -39,10 +39,9 @@ describe("device authentication", () => {
     clock.now += LIMITS.challengeMs;
     expect(await exchange(stale)).toBe(401);
     expect(await exchange(await challenge(app, did), newDevice())).toBe(401);
-    const other = newDevice();
-    expect(await exchange(await challenge(app, toHex(other.did)), other, toHex(other.did))).toBe(
-      401,
-    );
+    const other = toHex(newDevice().did);
+    const refused = await app.request("/v1/auth/challenge", postJson({ did: other }));
+    expect(refused.status).toBe(401);
   });
 
   test("tokens expire and can't be altered", async () => {

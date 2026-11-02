@@ -37,7 +37,7 @@ POST /v1/auth/token       {"did":"<hex>","challenge":"<b64>","sig":"<b64>"}
 ```
 
 - `sig` signs `"FLOW-SYNC/2 auth" ‖ instance ‖ group ‖ challenge` with the device's roster key. Devices pin `instance` when they pair (it is part of the store settings in `welcome`) and refuse any other value, so a malicious server can't relay a challenge from another instance.
-- A challenge is single-use and expires after 60 seconds.
+- A challenge is issued only for a current member's `did` (others get 401), is single-use, and expires after 60 seconds.
 - A token lasts at most 15 minutes and is bound to the `did`. Every request re-checks that the `did` is still a current device, so removal and leaving take effect at once.
 - `time` lets a device notice clock drift; no protocol step depends on it.
 - `group` lets a device restoring from the recovery key, which knows only the server, sign in. The group id isn't secret: every object header carries it.
@@ -111,8 +111,8 @@ A member opens a slot with `slot = Hash("pair", t)[0..16]`. Knowing the slot id 
 | Body read timeout | 30 s |
 | Live message | 64 KiB |
 | Live rate | 20 messages per second per device |
-| Requests | 600 per minute per device; 120 per minute per IP before authentication |
-| Failed authentication | exponential backoff per IP; a 15-minute ban after 10 failures |
+| Requests | 600 per minute per device; 120 per minute per IP for requests without a valid device token, whatever headers they carry |
+| Failed authentication | exponential backoff per IP; a 15-minute ban after 10 failures, which doesn't apply to requests with a valid device token |
 | Admin token failures | a 15-minute ban per IP after 5 failures |
 | Instance quota | set by the operator; `FLOW_SYNC_QUOTA`, default 2 GiB |
 
