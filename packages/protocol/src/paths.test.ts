@@ -1,6 +1,8 @@
 import fc from "fast-check";
 import { expect, test } from "vitest";
+import { utf8 } from "./bytes.ts";
 import { blobPath, logPath, parseDevicePath } from "./paths.ts";
+import { fuzzRuns, mutations } from "./testing/fuzz.ts";
 
 const did = fc.stringMatching(/^[0-9a-f]{32}$/);
 
@@ -28,4 +30,23 @@ test("other paths are refused", () => {
   ]) {
     expect(parseDevicePath(path)).toBeUndefined();
   }
+});
+
+test("any path that parses names exactly that path", () => {
+  const id = "0123456789abcdef".repeat(2);
+  const valid = [logPath(id, 1025), blobPath(id, "ab".repeat(32))].map((p) => utf8(p));
+  const changed = fc
+    .constantFrom(...valid)
+    .chain(mutations)
+    .map((bytes) => new TextDecoder().decode(bytes));
+  fc.assert(
+    fc.property(fc.oneof(fc.string(), changed), (input) => {
+      const parsed = parseDevicePath(input);
+      if (!parsed) return;
+      const again =
+        parsed.kind === "log" ? logPath(parsed.did, parsed.seq) : blobPath(parsed.did, parsed.hash);
+      expect(again).toBe(input);
+    }),
+    fuzzRuns(),
+  );
 });

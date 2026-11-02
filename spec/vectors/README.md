@@ -6,14 +6,14 @@ All byte strings are lowercase hex, except inside roster entries, which use the 
 
 | File | Covers |
 |---|---|
-| `canonical.json` | Canonical JSON serialization |
+| `canonical.json` | Canonical JSON serialization, including keys outside the Basic Multilingual Plane, which sort by UTF-16 code unit, not by code point |
 | `derive.json` | `Derive` and `Hash` ([crypto.md](../crypto.md#labelled-derivation)) |
 | `ed25519.json` | Strict verification: valid, tampered, wrong key, non-canonical `S`, small-order key; the eight small-order encodings; a non-canonical key encoding |
 | `box.json` | Box seal and open with fixed salts; tampered ciphertext, tag, commitment and salt, wrong key, wrong AAD, truncation |
 | `payload.json` | PADMÉ sizes; payload decoding; bad length, non-zero padding, corrupt gzip |
 | `keys.json` | Member ids, epoch commitment, purpose keys, HPKE wrap with a fixed ephemeral key, wrong-epoch and wrong-member unwraps, history chain |
-| `recovery.json` | Recovery secret, 24 words and derived keys; words with a bad checksum |
-| `envelope.json` | Log objects of each type opened in stream order, a live message, a snapshot blob; truncation, magic, suite, group, unknown sender, signature, tampering, replay, gap, a log read from the middle, wrong `prev`, swapped epoch, blob hash |
+| `recovery.json` | Recovery secret, 24 words and derived keys; words with a bad checksum, 23 words, and a valid 12-word phrase |
+| `envelope.json` | Log objects of each type opened in stream order, a live message, a snapshot blob; truncation, magic, suite, group, unknown sender, signature, tampering, replay, gap, a log read from the middle, wrong `prev`, swapped epoch, `seq` above 2<sup>53</sup> − 1, blob hash |
 | `roster.json` | A chain through genesis, add, rename, remove, restore, recovery change, add, leave and rotate, with the state after each entry (including whether a rotate is due) and the device names it carries; bad and missing signatures, unknown fields, wrong `seq`, truncated chain, removed signer, weak key, re-adding a removed device, wrong epoch sets and numbers, self-removal, renaming the recovery key, a non-member signer, a used recovery key; a leave by a non-member, by the recovery member and by the last device, a leave removing another device or carrying an epoch, a rotate without an epoch, with a removal, or wrapped to a device that left; six forks and their winners, including leave against remove and rotate, and concurrent rotates |
 | `pairing.json` | Pairing keys, SAS, mailbox slot, and a sealed `join` message |
 | `lan.json` | Discovery tag, hello AAD, transcripts, session keys, frame AAD |

@@ -94,6 +94,11 @@ export function envelopeVectors(): Vectors {
       object: resign(first, (h) => ({ ...h, epoch: 1 }), "salt 7", 0),
       error: "commitment",
     },
+    {
+      name: "seq-above-2^53",
+      object: resign(first, (h) => ({ ...h, seq: 2 ** 53 }), "salt 8"),
+      error: "range",
+    },
   ];
 
   const blobPayload = encodePayload(utf8(changes));
