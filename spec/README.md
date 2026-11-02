@@ -20,7 +20,7 @@ FLOW-SYNC/2 links one person's Flow devices into a sync group. Devices exchange 
 - `‖` is byte concatenation. `u8`, `u32`, `u64` are unsigned big-endian integers of 1, 4 and 8 bytes.
 - Labels are ASCII strings with no terminator, for example `"FLOW-SYNC/2 seal"`.
 - `hex` is lowercase hexadecimal. `b64` is base64url without padding ([RFC 4648 §5](https://www.rfc-editor.org/rfc/rfc4648#section-5)), as in FLOW-SYNC/1.
-- Canonical JSON is the FLOW-SYNC/1 form: no whitespace, object keys sorted by Unicode code point, standard string escaping, integers only (no floats, no exponents). For the values used here it equals [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785).
+- Canonical JSON is the FLOW-SYNC/1 form: no whitespace, object keys sorted by their UTF-16 code units as in [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) (this differs from code point order only for keys outside the Basic Multilingual Plane), standard string escaping, integers only (no floats, no exponents). For the values used here it equals RFC 8785.
 - A *device* is one Flow installation. A *member* is a device or the recovery key in the roster. The *group* is the set of members.
 
 ## Versioning

@@ -6,7 +6,7 @@ All byte strings are lowercase hex, except inside roster entries, which use the 
 
 | File | Covers |
 |---|---|
-| `canonical.json` | Canonical JSON serialization |
+| `canonical.json` | Canonical JSON serialization, including keys outside the Basic Multilingual Plane, which sort by UTF-16 code unit, not by code point |
 | `derive.json` | `Derive` and `Hash` ([crypto.md](../crypto.md#labelled-derivation)) |
 | `ed25519.json` | Strict verification: valid, tampered, wrong key, non-canonical `S`, small-order key; the eight small-order encodings; a non-canonical key encoding |
 | `box.json` | Box seal and open with fixed salts; tampered ciphertext, tag, commitment and salt, wrong key, wrong AAD, truncation |
