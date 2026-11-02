@@ -14,6 +14,7 @@ import {
 import { FlowSyncError } from "./errors.ts";
 import { memberSecrets } from "./keys.ts";
 import { encodePayload } from "./payload.ts";
+import { fuzzRuns, mutations, refused } from "./testing/fuzz.ts";
 
 const group = randomBytes(16);
 const sender = memberSecrets(randomBytes(32), randomBytes(32));
@@ -49,5 +50,27 @@ test("arbitrary bytes are rejected with a protocol error, never a crash", () => 
         expect(error).toBeInstanceOf(FlowSyncError);
       }
     }),
+  );
+});
+
+test("any change to a sealed object is refused", async () => {
+  const header: Header = {
+    type: ObjectType.changes,
+    group,
+    epoch: 0,
+    sender: sender.did,
+    seq: 1,
+    prev: ZERO_HASH,
+  };
+  const sealed = sealObject(header, key, encodePayload(randomBytes(64)), sender.sigSeed);
+  await fc.assert(
+    fc.asyncProperty(mutations(sealed), (changed) =>
+      refused(() => {
+        const object = parseObject(changed, group);
+        verifyObject(object, sender.sigPublic);
+        openObject(object, key);
+      }),
+    ),
+    fuzzRuns(),
   );
 });
