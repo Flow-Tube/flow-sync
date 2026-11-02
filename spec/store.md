@@ -68,7 +68,7 @@ A failure at any step discards the object. It is never partly applied.
 
 Everything a store, a server or a LAN peer sends is untrusted until it verifies. A device MUST:
 
-- **Bound what it reads.** Stop reading, and fail the request, past 4 MiB for an object or a blob, 4 MiB of payload for a LAN frame, 64 KiB for a live message, and 16 MiB for any other response (a roster page, a listing, a JSON answer).
+- **Bound what it reads.** Stop reading, and fail the request, past 4 MiB for an object or a blob, 4 MiB + 64 KiB of content for a LAN frame ([live.md](live.md#requests)), 64 KiB for a live message, and 16 MiB for any other response (a roster page, a listing, a JSON answer).
 - **Make progress or stop.** End a paged read (roster entries, `changes`, a listing) when a page doesn't advance its cursor or position. The next sync starts again.
 - **Contain one bad item.** A discarded object stops the reading of that sender's log at that `seq`, as a gap does ([protocol.md](protocol.md#streams)); the device still reads the other senders and applies what verifies. On WebDAV, S3 and LAN peers, a roster entry that doesn't parse, or a file in `roster/` that isn't an entry, is ignored like a losing fork candidate and never stops the rest of the roster from being read.
 - **Refuse numbers it can't hold.** A `seq` above 2<sup>53</sup> − 1 in a manifest, an ack or a version vector makes that object invalid, as in an envelope header.
