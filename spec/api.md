@@ -7,7 +7,7 @@ The Flow server is a store ([store.md](store.md)) with extras: authenticated acc
 - Base path `/v1`. Requests and responses are `application/json` (UTF-8, unknown fields rejected) or `application/octet-stream` for objects. Any other `Content-Type` is rejected with 415.
 - Errors are `{"error":"<code>"}` with the status below. Messages never echo input.
 - No HTML except a one-line plain-text status at `/`. No CORS headers: there is no browser client.
-- Every response carries `Content-Security-Policy: default-src 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` and, over HTTPS, `Strict-Transport-Security`.
+- Every response carries `Content-Security-Policy: default-src 'none'; base-uri 'none'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` and `Strict-Transport-Security: max-age=31536000; includeSubDomains` (browsers ignore it over plain HTTP).
 - An instance that hasn't been claimed answers only `/v1/health`, `/v1/info` and `/v1/claim`.
 
 | Code | Status | Meaning |
@@ -91,7 +91,7 @@ The server validates an append with the reference roster rules ([protocol.md](pr
 
 - **Writes.** A device writes only under `dev/<its did>/`. The server checks that the body is a well-formed envelope or blob: length, magic, suite, group, sender equal to the caller, `seq` equal to the path, the current epoch, a valid signature, and for blobs a SHA-256 equal to the name.
 - **Deletes.** A device deletes its own paths, and any path of a removed device.
-- **Reads.** Objects are served as `application/octet-stream` with `Content-Disposition: attachment`, only to current devices. The server never parses, transforms or executes stored content.
+- **Reads.** Objects are served as `application/octet-stream` with `Content-Disposition: attachment; filename="flow-sync.bin"`, only to current devices. The server never parses, transforms or executes stored content.
 
 Garbage collection is client-driven, as on every backend ([protocol.md](protocol.md#garbage-collection)). The server can't read acks, so it never decides on its own what to delete. It deletes expired pairing slots and challenges.
 

@@ -44,6 +44,6 @@ export function bearer(c: Context): string | undefined {
 export function octets(c: Context, data: Uint8Array): Response {
   return c.body(data.slice(), 200, {
     "content-type": "application/octet-stream",
-    "content-disposition": "attachment",
+    "content-disposition": 'attachment; filename="flow-sync.bin"',
   });
 }

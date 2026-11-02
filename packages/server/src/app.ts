@@ -35,7 +35,12 @@ export function createApp<L extends LiveRelay>(deps: AppDeps<L>) {
   app.use(requestLog(deps.log, deps.now));
   app.use(
     secureHeaders({
-      contentSecurityPolicy: { defaultSrc: ["'none'"] },
+      contentSecurityPolicy: {
+        defaultSrc: ["'none'"],
+        baseUri: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+      strictTransportSecurity: "max-age=31536000; includeSubDomains",
       referrerPolicy: "no-referrer",
       crossOriginResourcePolicy: "same-origin",
     }),
