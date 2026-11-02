@@ -6,7 +6,7 @@ Render mounts persistent disks owned by root, and the image runs as an unprivile
 
 ## Deploy
 
-1. Create a Blueprint from the repository with the Blueprint path `deploy/render/render.yaml`.
+1. Create a Blueprint from your fork's `release` branch ([how](README.md#use-a-release)) with the Blueprint path `deploy/render/render.yaml`.
 2. Render creates the web service and the database and generates `FLOW_SYNC_ADMIN_TOKEN`. Copy the token from the service's environment to claim the instance.
 
 ## Limits

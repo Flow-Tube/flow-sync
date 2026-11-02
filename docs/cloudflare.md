@@ -4,7 +4,7 @@ Metadata in D1, object bytes in R2, and the live channel on one Durable Object, 
 
 ## Deploy
 
-From the repository root, with a Cloudflare account:
+From a clone at the latest release tag ([how](README.md#use-a-release)), with a Cloudflare account:
 
 ```sh
 pnpm install --frozen-lockfile

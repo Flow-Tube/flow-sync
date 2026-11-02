@@ -4,7 +4,7 @@ The Docker image on one machine with SQLite on a Fly volume, from [fly.toml](../
 
 ## Deploy
 
-From the repository root, with the Fly CLI:
+From a clone at the latest release tag ([how](README.md#use-a-release)), with the Fly CLI:
 
 ```sh
 fly apps create <app>

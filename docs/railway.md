@@ -4,7 +4,7 @@ The Docker image with SQLite on a Railway volume.
 
 ## Deploy
 
-1. Create a service from the repository and set its config file path to `deploy/railway/railway.json`, which builds [deploy/docker/Dockerfile](../deploy/docker/Dockerfile).
+1. Create a service from your fork's `release` branch ([how](README.md#use-a-release)) and set its config file path to `deploy/railway/railway.json`, which builds [deploy/docker/Dockerfile](../deploy/docker/Dockerfile).
 2. Attach a volume mounted at `/data`.
 3. Set `FLOW_SYNC_ADMIN_TOKEN` to 32 or more random characters, `FLOW_SYNC_TRUST_PROXY=1`, and `RAILWAY_RUN_UID=0`.
 4. Generate a public domain for the service.
