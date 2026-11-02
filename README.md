@@ -9,7 +9,7 @@ Linked devices for [Flow](https://github.com/Flow-Tube/Flow) and [Flow Desktop](
 
 ## Status
 
-The FLOW-SYNC/2 specification is in review. There is no server release yet. Nothing is hosted by the maintainers: every instance is self-hosted.
+0.1.0-beta is the first release; see [CHANGELOG.md](CHANGELOG.md). Nothing is hosted by the maintainers: every instance is self-hosted, following [docs/README.md](docs/README.md).
 
 ## Repository
 
