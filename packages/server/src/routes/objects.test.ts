@@ -66,6 +66,7 @@ describe("objects", () => {
     tampered[100] = (tampered[100] as number) ^ 1;
     for (const bytes of [
       h.object(2),
+      h.object(2 ** 53),
       h.object(1, { epoch: 1 }),
       h.object(1, { type: ObjectType.live }),
       otherGroup,

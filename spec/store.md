@@ -56,7 +56,7 @@ The smallest valid envelope is 482 bytes: a 256-byte payload inside a box.
 
 A reader MUST, in this order:
 
-1. Check the length (482 bytes to 4 MiB), the magic, a supported suite, and the group id.
+1. Check the length (482 bytes to 4 MiB), the magic, a supported suite, the group id, and that `seq` is at most 2<sup>53</sup> − 1, the largest integer every implementation reads exactly.
 2. Find the sender in the roster as a member while `epoch` was in force. Objects written before a device's removal stay valid.
 3. Verify the signature with the sender's key. Signatures are checked before anything is decrypted.
 4. Check `seq` and `prev` against the sender's stream ([protocol.md](protocol.md#streams)), or the live counter for live messages.
