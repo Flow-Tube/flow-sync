@@ -55,6 +55,7 @@ export function createApp<L extends LiveRelay>(deps: AppDeps<L>) {
   app.use(guardRequests(guards, tokenDevice(group, deps.now)));
   app.onError((error, c) => {
     c.set("errorCode", errorCode(error));
+    if (errorCode(error) === "internal") c.set("errorName", error.name);
     return errorResponse(c, error);
   });
   app.notFound((c) => {

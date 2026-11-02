@@ -120,4 +120,4 @@ A member opens a slot with `slot = Hash("pair", t)[0..16]`. Knowing the slot id 
 
 ## Logging
 
-The server logs request type, status, size, duration and error code. It never logs bodies, object names beyond their type, keys, tokens, challenges or IP addresses. IP addresses are kept in memory only, for rate limits and bans, and are forgotten when the ban or window ends. Prometheus metrics are optional and off by default.
+The server logs the time (UTC), request type, status, size, duration and error code, and for an unexpected error its class name, never its message. It never logs bodies, object names beyond their type, keys, tokens, challenges or IP addresses. IP addresses are kept in memory only, for rate limits and bans, and are forgotten when the ban or window ends. Prometheus metrics are optional and off by default.

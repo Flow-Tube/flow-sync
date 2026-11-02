@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { openSqlite } from "./storage/sqlite.ts";
 import { testApp } from "./testing/app.ts";
 
 test("health, info and the root status", async () => {
@@ -36,6 +37,21 @@ test("unknown routes answer not_found without echoing the path", async () => {
   expect(await res.json()).toEqual({ error: "not_found" });
   expect(JSON.stringify(logs)).not.toContain("secret-name");
   expect(logs.at(-1)).toMatchObject({ method: "GET", status: 404, error: "not_found" });
+});
+
+test("unexpected errors are logged by class, never by message", async () => {
+  const storage = openSqlite(":memory:");
+  storage.meta.rosterAfter = () => Promise.reject(new TypeError("secret-detail"));
+  const { app, logs, clock } = testApp({}, storage);
+  const res = await app.request("/v1/info");
+  expect(res.status).toBe(500);
+  expect(await res.json()).toEqual({ error: "internal" });
+  expect(logs.at(-1)).toMatchObject({
+    time: new Date(clock.now).toISOString(),
+    error: "internal",
+    cause: "TypeError",
+  });
+  expect(JSON.stringify(logs)).not.toContain("secret-detail");
 });
 
 test("security.txt is served only when the operator configures it", async () => {
