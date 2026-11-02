@@ -31,6 +31,7 @@ export function authRoutes({ group, meta, now }: AuthDeps) {
     .post("/v1/auth/challenge", limitBody(LIMITS.jsonBody), async (c) => {
       const body = await readJson(c, challengeSchema);
       const state = await group.claimed();
+      if (!state.members.has(body.did)) throw new HttpError("unauthorized");
       await meta.purgeExpired(now());
       const challenge = randomBytes(32);
       await meta.putChallenge(toHex(challenge), body.did, now() + LIMITS.challengeMs);
