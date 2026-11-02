@@ -9,7 +9,7 @@ The Docker image with SQLite on a Railway volume.
 3. Set `FLOW_SYNC_ADMIN_TOKEN` to 32 or more random characters, `FLOW_SYNC_TRUST_PROXY=1`, and `RAILWAY_RUN_UID=0`.
 4. Generate a public domain for the service.
 
-Railway mounts volumes owned by root, and the image runs as an unprivileged user that can't write there, so `RAILWAY_RUN_UID=0` runs the container as root. Railway isolates each service, but if you'd rather keep the server unprivileged, add Railway Postgres instead of the volume and set `DATABASE_URL` to its connection string.
+Railway mounts volumes owned by root, and the image runs as an unprivileged user that can't write there, so `RAILWAY_RUN_UID=0` runs the container as root. To keep the server unprivileged, which we recommend, skip the volume and `RAILWAY_RUN_UID`, add Railway Postgres, and set `DATABASE_URL` to its connection string.
 
 ## Limits
 

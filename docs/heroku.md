@@ -15,7 +15,7 @@ heroku container:login
 deploy/heroku/release.sh <app>
 ```
 
-[release.sh](../deploy/heroku/release.sh) builds the image from [deploy/docker/Dockerfile](../deploy/docker/Dockerfile), pushes it and releases it. `PGSSLMODE=no-verify` is needed because Heroku Postgres certificates don't verify against public roots.
+[release.sh](../deploy/heroku/release.sh) builds the image from [deploy/docker/Dockerfile](../deploy/docker/Dockerfile), pushes it and releases it. `PGSSLMODE=no-verify` is needed because Heroku Postgres certificates don't verify against public roots. The connection is still encrypted, but someone able to intercept it inside Heroku could read the server's token secret and act as any device towards the server. That exposes only ciphertext: device data is encrypted before it leaves the device, and the server checks every roster entry's signatures when it reads them back.
 
 ## Limits
 
