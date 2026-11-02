@@ -12,7 +12,7 @@ describe("keys", () => {
     const own = `/v1/keys/00000000/${toHex(h.device.did)}.k`;
     const res = await h.app.request(own, bearer(token));
     expect(res.headers.get("content-type")).toBe("application/octet-stream");
-    expect(res.headers.get("content-disposition")).toBe("attachment");
+    expect(res.headers.get("content-disposition")).toBe('attachment; filename="flow-sync.bin"');
     expect(toB64(new Uint8Array(await res.arrayBuffer()))).toBe(h.wraps[toHex(h.device.did)]);
     const other = `/v1/keys/00000000/${toHex(h.recovery.did)}.k`;
     expect((await h.app.request(other, bearer(token))).status).toBe(403);
