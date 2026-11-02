@@ -1,5 +1,6 @@
 export type ErrorCode =
   | "length"
+  | "range"
   | "magic"
   | "suite"
   | "group"
