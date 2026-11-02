@@ -17,7 +17,12 @@ test("every response carries the security headers", async () => {
   const { app } = testApp();
   for (const path of ["/v1/health", "/missing"]) {
     const res = await app.request(path);
-    expect(res.headers.get("content-security-policy")).toBe("default-src 'none'");
+    expect(res.headers.get("content-security-policy")).toBe(
+      "default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+    );
+    expect(res.headers.get("strict-transport-security")).toBe(
+      "max-age=31536000; includeSubDomains",
+    );
     expect(res.headers.get("x-content-type-options")).toBe("nosniff");
     expect(res.headers.get("referrer-policy")).toBe("no-referrer");
     expect(res.headers.get("cache-control")).toBe("no-store");

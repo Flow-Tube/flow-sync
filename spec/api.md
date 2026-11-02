@@ -7,7 +7,7 @@ The Flow server is a store ([store.md](store.md)) with extras: authenticated acc
 - Base path `/v1`. Requests and responses are `application/json` (UTF-8, unknown fields rejected) or `application/octet-stream` for objects. Any other `Content-Type` is rejected with 415.
 - Errors are `{"error":"<code>"}` with the status below. Messages never echo input.
 - No HTML except a one-line plain-text status at `/`. No CORS headers: there is no browser client.
-- Every response carries `Content-Security-Policy: default-src 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` and, over HTTPS, `Strict-Transport-Security`.
+- Every response carries `Content-Security-Policy: default-src 'none'; base-uri 'none'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` and `Strict-Transport-Security: max-age=31536000; includeSubDomains` (browsers ignore it over plain HTTP).
 - An instance that hasn't been claimed answers only `/v1/health`, `/v1/info` and `/v1/claim`.
 
 | Code | Status | Meaning |
@@ -37,7 +37,7 @@ POST /v1/auth/token       {"did":"<hex>","challenge":"<b64>","sig":"<b64>"}
 ```
 
 - `sig` signs `"FLOW-SYNC/2 auth" ‖ instance ‖ group ‖ challenge` with the device's roster key. Devices pin `instance` when they pair (it is part of the store settings in `welcome`) and refuse any other value, so a malicious server can't relay a challenge from another instance.
-- A challenge is single-use and expires after 60 seconds.
+- A challenge is issued only for a current member's `did` (others get 401), is single-use, and expires after 60 seconds.
 - A token lasts at most 15 minutes and is bound to the `did`. Every request re-checks that the `did` is still a current device, so removal and leaving take effect at once.
 - `time` lets a device notice clock drift; no protocol step depends on it.
 - `group` lets a device restoring from the recovery key, which knows only the server, sign in. The group id isn't secret: every object header carries it.
@@ -91,7 +91,7 @@ The server validates an append with the reference roster rules ([protocol.md](pr
 
 - **Writes.** A device writes only under `dev/<its did>/`. The server checks that the body is a well-formed envelope or blob: length, magic, suite, group, sender equal to the caller, `seq` equal to the path, the current epoch, a valid signature, and for blobs a SHA-256 equal to the name.
 - **Deletes.** A device deletes its own paths, and any path of a removed device.
-- **Reads.** Objects are served as `application/octet-stream` with `Content-Disposition: attachment`, only to current devices. The server never parses, transforms or executes stored content.
+- **Reads.** Objects are served as `application/octet-stream` with `Content-Disposition: attachment; filename="flow-sync.bin"`, only to current devices. The server never parses, transforms or executes stored content.
 
 Garbage collection is client-driven, as on every backend ([protocol.md](protocol.md#garbage-collection)). The server can't read acks, so it never decides on its own what to delete. It deletes expired pairing slots and challenges.
 
@@ -111,8 +111,8 @@ A member opens a slot with `slot = Hash("pair", t)[0..16]`. Knowing the slot id 
 | Body read timeout | 30 s |
 | Live message | 64 KiB |
 | Live rate | 20 messages per second per device |
-| Requests | 600 per minute per device; 120 per minute per IP before authentication |
-| Failed authentication | exponential backoff per IP; a 15-minute ban after 10 failures |
+| Requests | 600 per minute per device; 120 per minute per IP for requests without a valid device token, whatever headers they carry |
+| Failed authentication | exponential backoff per IP; a 15-minute ban after 10 failures, which doesn't apply to requests with a valid device token |
 | Admin token failures | a 15-minute ban per IP after 5 failures |
 | Instance quota | set by the operator; `FLOW_SYNC_QUOTA`, default 2 GiB |
 

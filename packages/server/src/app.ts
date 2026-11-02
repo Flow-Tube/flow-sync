@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
+import { tokenDevice } from "./auth/device.ts";
 import type { Config } from "./config.ts";
 import type { AppEnv } from "./env.ts";
 import { Group } from "./group.ts";
@@ -35,7 +36,12 @@ export function createApp<L extends LiveRelay>(deps: AppDeps<L>) {
   app.use(requestLog(deps.log, deps.now));
   app.use(
     secureHeaders({
-      contentSecurityPolicy: { defaultSrc: ["'none'"] },
+      contentSecurityPolicy: {
+        defaultSrc: ["'none'"],
+        baseUri: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+      strictTransportSecurity: "max-age=31536000; includeSubDomains",
       referrerPolicy: "no-referrer",
       crossOriginResourcePolicy: "same-origin",
     }),
@@ -45,7 +51,8 @@ export function createApp<L extends LiveRelay>(deps: AppDeps<L>) {
     c.header("Cache-Control", "no-store");
   });
   const guards = createGuards(deps.clientIp, deps.now);
-  app.use(guardRequests(guards));
+  const group = new Group(deps.storage.meta);
+  app.use(guardRequests(guards, tokenDevice(group, deps.now)));
   app.onError((error, c) => {
     c.set("errorCode", errorCode(error));
     if (errorCode(error) === "internal") c.set("errorName", error.name);
@@ -55,7 +62,6 @@ export function createApp<L extends LiveRelay>(deps: AppDeps<L>) {
     c.set("errorCode", "not_found");
     return errorResponse(c, new HttpError("not_found"));
   });
-  const group = new Group(deps.storage.meta);
   app.route("/", metaRoutes(deps.config, group));
   const members = { group, meta: deps.storage.meta, now: deps.now, guards };
   const relay = deps.live?.(group, deps.now);
