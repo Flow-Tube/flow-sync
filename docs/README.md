@@ -20,3 +20,5 @@ Only the Docker image is built and run in CI. The other templates are tested aga
 Settings shared by every host (admin token, quota, security contact) are listed in the [Docker guide](../deploy/docker/README.md#settings).
 
 [asvs.md](asvs.md) and [api-top-10.md](api-top-10.md) map the server and these templates to OWASP ASVS 5.0 Level 2 and the OWASP API Security Top 10.
+
+[recovery.md](recovery.md) covers losing devices, the recovery key, or the server.
