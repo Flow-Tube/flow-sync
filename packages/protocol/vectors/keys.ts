@@ -77,6 +77,10 @@ export function recoveryVectors(): Vectors {
   [swapped[0], swapped[1]] = [swapped[1] as string, swapped[0] as string];
   return {
     cases: [{ secret: hex(secret), words, ...member("recovery", recovery[0] as MemberSecrets) }],
-    invalidWords: [swapped.join(" "), words.split(" ").slice(0, 23).join(" ")],
+    invalidWords: [
+      swapped.join(" "),
+      words.split(" ").slice(0, 23).join(" "),
+      recoveryWords(secret.subarray(0, 16)),
+    ],
   };
 }

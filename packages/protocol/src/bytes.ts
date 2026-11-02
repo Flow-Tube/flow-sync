@@ -7,6 +7,7 @@ import {
   utf8ToBytes,
 } from "@noble/hashes/utils.js";
 import { base64urlnopad } from "@scure/base";
+import { fail } from "./errors.ts";
 
 export {
   bytesToHex as toHex,
@@ -44,6 +45,6 @@ export function readU32(bytes: Uint8Array, offset: number): number {
 export function readU64(bytes: Uint8Array, offset: number): number {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const value = view.getBigUint64(offset);
-  if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new RangeError("u64 above 2^53");
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) fail("range");
   return Number(value);
 }

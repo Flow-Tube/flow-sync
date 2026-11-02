@@ -179,7 +179,7 @@ sig seed = Derive(r, "", "recovery sig", "", 32)
 kem sk   = Derive(r, "", "recovery kem", "", 32)
 ```
 
-The QR code holds the same 24 words separated by single spaces. Devices store only the recovery member's public keys.
+The QR code holds the same 24 words separated by single spaces. Devices refuse any other number of words, including a valid shorter BIP-39 phrase. Devices store only the recovery member's public keys.
 
 ## Choices and alternatives
 
