@@ -2,6 +2,7 @@ import {
   BOX_OVERHEAD,
   type DevicePath,
   fromHex,
+  logPath,
   ObjectType,
   objectSignature,
   parseDevicePath,
@@ -19,9 +20,11 @@ import { limitBody, octets, readBytes } from "../http/body.ts";
 import { HttpError } from "../http/errors.ts";
 import { LIMITS } from "../limits.ts";
 import type { Stored } from "../live/relay.ts";
-import type { BlobStore } from "../storage/types.ts";
+import type { BlobStore, MetaStore } from "../storage/types.ts";
 
 const PREFIX = "/v1/objects/";
+
+type Stores = { meta: MetaStore; blobs: BlobStore };
 const changesSchema = z.object({
   after: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(LIMITS.changesPage).default(LIMITS.changesPage),
@@ -34,8 +37,20 @@ function devicePath(c: Context): DevicePath & { path: string } {
   return { ...parsed, path };
 }
 
+/** The epoch of the sender's object at `seq` - 1, or 0 when the server doesn't hold it. */
+async function previousEpoch(
+  { meta, blobs }: Stores,
+  state: RosterState,
+  target: Extract<DevicePath, { kind: "log" }>,
+) {
+  const record = target.seq > 1 && (await meta.getObject(logPath(target.did, target.seq - 1)));
+  const bytes = record && (await blobs.get(record.hash));
+  return bytes ? parseObject(bytes, fromHex(state.group)).header.epoch : 0;
+}
+
 /** Checks that the bytes are what the path claims, signed by the device that owns it. */
 async function checkObject(
+  stores: Stores,
   state: RosterState,
   target: DevicePath,
   bytes: Uint8Array,
@@ -51,11 +66,15 @@ async function checkObject(
     header.type !== ObjectType.live &&
     toHex(header.sender) === target.did &&
     header.seq === target.seq &&
-    header.epoch === state.epoch;
+    header.epoch <= state.epoch;
   if (!valid) throw new HttpError("invalid");
   const sender = state.members.get(target.did);
   if (!sender) throw new HttpError("forbidden");
   if (!(await verifySignature(objectSignature(object, sender.sig)))) throw new HttpError("invalid");
+  // Sealed before the sender saw the new epoch (spec/api.md, Objects); a device never goes back.
+  if (header.epoch < state.epoch && header.epoch < (await previousEpoch(stores, state, target))) {
+    throw new HttpError("invalid");
+  }
 }
 
 export function objectRoutes(
@@ -75,7 +94,7 @@ export function objectRoutes(
         if (existing.hash !== hash) throw new HttpError("conflict");
         return c.body(null, 200);
       }
-      await checkObject(await group.claimed(), target, bytes, hash);
+      await checkObject(deps, await group.claimed(), target, bytes, hash);
       if ((await meta.usage()).bytes + bytes.length > config.quota) throw new HttpError("quota");
       await blobs.put(hash, bytes);
       const result = await meta.putObject({
