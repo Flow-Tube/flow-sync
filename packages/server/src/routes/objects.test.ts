@@ -98,6 +98,23 @@ describe("objects", () => {
     ).toBe(403);
   });
 
+  test("an object sealed before its sender saw a new epoch is stored, but never one after", async () => {
+    const h = await setup();
+    const put = async (seq: number, options = {}) =>
+      (await h.app.request(objectUrl(h.device, seq), putBytes(h.token, h.object(seq, options))))
+        .status;
+    expect(await put(1)).toBe(201);
+    const { joining } = await addDevice(h, h.token);
+    const { entry, wraps, chain, head, key } = await removal(h, h.token, toHex(joining.did));
+    expect((await append(h, h.token, { entry, wraps, chain }, head)).status).toBe(201);
+    const current = { epochKey: key, epoch: 1 };
+    expect(await put(2)).toBe(201);
+    expect(await put(3, current)).toBe(201);
+    expect(await put(4)).toBe(400);
+    expect(await put(4, { epoch: 2 })).toBe(400);
+    expect(await put(4, current)).toBe(201);
+  });
+
   test("snapshot blobs are stored under their hash", async () => {
     const h = await setup();
     const key = purposeKey(h.epochKey, h.group, 0, "snapshot");

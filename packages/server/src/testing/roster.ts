@@ -66,7 +66,7 @@ export async function removal(h: Harness, token: string, removed: string) {
     },
     [h.device],
   );
-  return { entry, wraps, chain, head: state.head };
+  return { entry, wraps, chain, head: state.head, key };
 }
 
 export async function rotation(h: Harness, token: string) {

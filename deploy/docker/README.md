@@ -7,9 +7,14 @@ The image runs as a non-root user on a distroless Node base, keeps its data in `
 `compose.yaml` runs the server behind Caddy, which gets certificates from Let's Encrypt. It needs a public DNS name pointing at the host, and ports 80 and 443 open.
 
 ```sh
+mkdir flow-sync && cd flow-sync
+curl -fLO https://github.com/Flow-Tube/flow-sync/releases/latest/download/compose.yaml
+curl -fLO https://github.com/Flow-Tube/flow-sync/releases/latest/download/Caddyfile
 openssl rand -hex 32 > admin_token
 FLOW_SYNC_DOMAIN=sync.example.org docker compose up -d
 ```
+
+The release's `compose.yaml` pins the image to that version and digest. To update, download both files from the new release and run `docker compose up -d` again.
 
 Use the admin token once, from Flow, to claim the instance. Set `FLOW_SYNC_ADMIN=off` afterwards if you don't need admin access.
 

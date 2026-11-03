@@ -4,7 +4,7 @@ Metadata in Netlify Database (Postgres) and object bytes in Netlify Blobs with s
 
 ## Deploy
 
-1. Create a site from the repository. Keep the base directory at the repository root and set the package directory to `deploy/netlify`, which holds [netlify.toml](../deploy/netlify/netlify.toml) and the function.
+1. Create a site from your fork's `release` branch ([how](README.md#use-a-release)). Keep the base directory at the repository root and set the package directory to `deploy/netlify`, which holds [netlify.toml](../deploy/netlify/netlify.toml) and the function.
 2. Add Netlify Database. It sets `NETLIFY_DATABASE_URL`.
 3. Set `FLOW_SYNC_ADMIN_TOKEN` to 32 or more random characters, then deploy. Blobs need no setup.
 

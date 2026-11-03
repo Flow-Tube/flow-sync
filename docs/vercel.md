@@ -4,7 +4,7 @@ Metadata in Postgres (Neon from the Vercel Marketplace) and object bytes in a pr
 
 ## Deploy
 
-1. Import the repository as a Vercel project and set its root directory to `deploy/vercel`, keeping "Include files outside the root directory" on. [deploy/vercel/vercel.json](../deploy/vercel/vercel.json) installs from the repository root.
+1. Import your fork as a Vercel project with its `release` branch as the production branch ([how](README.md#use-a-release)), and set its root directory to `deploy/vercel`, keeping "Include files outside the root directory" on. [deploy/vercel/vercel.json](../deploy/vercel/vercel.json) installs from the repository root.
 2. Add a Neon database from the Marketplace. It sets `DATABASE_URL`; use the pooled connection string.
 3. Create a Blob store and connect it to the project. It sets `BLOB_READ_WRITE_TOKEN`.
 4. Set `FLOW_SYNC_ADMIN_TOKEN` to 32 or more random characters, then deploy.
