@@ -99,7 +99,7 @@ After message 3, either device may send requests at any time, and answers may co
 | `put` | `path` | none | in the request: the object |
 | `live` | none | no response | in the request: the live envelope |
 
-A frame holds at most 4 MiB of payload. A device closes a session 3 seconds after the other side stops sending. A peer serves what it holds, its own objects and the ones it has fetched. It accepts a `put` only of an object that passes steps 1 to 3 of [reading an envelope](store.md#reading-an-envelope), at the path that object belongs at.
+The content of a frame, the header line with its `\n` and bytes, is at most 4 MiB + 64 KiB (4,259,840 bytes), so a full 4 MiB object fits with its header. Its encoded frame is under 4 MiB + 256 KiB, the largest WebSocket message a device must accept. A device closes a session 3 seconds after the other side stops sending. A peer serves what it holds, its own objects and the ones it has fetched. It accepts a `put` only of an object that passes steps 1 to 3 of [reading an envelope](store.md#reading-an-envelope), at the path that object belongs at.
 
 ### LAN groups
 
