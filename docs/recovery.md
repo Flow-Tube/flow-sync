@@ -21,11 +21,13 @@ A group that lives only on its devices (LAN only) keeps nothing on a store, so t
 
 ## You lost the words, but have a device
 
-Your data is safe while any device is linked. Flow can't yet replace the words without a restore, so keep at least two devices linked until it can.
+Your data is safe while any device is linked. On a linked device, open Linked devices and choose Replace recovery words. Flow makes new words and moves your devices to a new encryption key; the old words stop working. Write the new words down.
 
 ## Someone else may have your words
 
-They can restore the group onto their own device once. Your devices then list a device you don't know: remove it. Because their restore also replaced the recovery key with one they hold, they could restore again, and until Flow can replace the words from a linked device, the only way to stop that is to start a new group (below).
+Replace the words from a linked device (above) before they use them: the old words then can't restore the group or read anything synced afterwards. Data synced before the replacement stays readable to anyone with the old words who can still read the store's files, for example with a WebDAV folder's password.
+
+If they restored first, your devices list a device you don't know. Remove it, then replace the recovery words, because their restore gave them a recovery key of their own.
 
 ## You lost every device and the words
 
