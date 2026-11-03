@@ -66,6 +66,8 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    outputs:
+      digest: ${{ steps.index.outputs.digest }}
     permissions:
       contents: read
       packages: write
@@ -169,3 +171,31 @@ jobs:
           echo "released $released, rebuilt $REBUILT"
           test "$released" = "$REBUILT"
         shell: bash
+
+  release:
+    needs: [publish, reproduce]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Pin the image in compose.yaml and take the notes from CHANGELOG.md
+        env:
+          DIGEST: ${{ needs.publish.outputs.digest }}
+          VERSION: ${{ github.ref_name }}
+          OUT: ${{ runner.temp }}
+        run: |
+          sed "s|$IMAGE:latest|$IMAGE:${VERSION#v}@$DIGEST|" deploy/docker/compose.yaml > "$OUT/compose.yaml"
+          grep -qF "$IMAGE:${VERSION#v}@$DIGEST" "$OUT/compose.yaml"
+          cp deploy/docker/Caddyfile "$OUT/Caddyfile"
+          awk -v h="## ${VERSION#v}" '$0 == h {on = 1; next} /^## / {on = 0} on' CHANGELOG.md > "$OUT/notes.md"
+          grep -q . "$OUT/notes.md"
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+          OUT: ${{ runner.temp }}
+        run: gh release create "$VERSION" --verify-tag --title "$VERSION" --notes-file "$OUT/notes.md" "$OUT/compose.yaml" "$OUT/Caddyfile"

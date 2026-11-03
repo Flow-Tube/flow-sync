@@ -233,7 +233,7 @@ There is no browser client and no HTML; the headers below are set anyway.
 
 | Id | Requirement (short) | Status | Where / why |
 |---|---|---|---|
-| V15.1.1 | Remediation time frames for dependencies | partly | Dependabot weekly (`.github/dependabot.yml`) and OSV scans (`.github/workflows/security.yml:26-37`); `SECURITY.md` sets 90 days for reports but no time frame for vulnerable dependencies |
+| V15.1.1 | Remediation time frames for dependencies | met | `SECURITY.md` "Vulnerable dependencies" (critical 7 days, high 30 days); Dependabot weekly (`.github/dependabot.yml`) and OSV scans (`.github/workflows/security.yml:26-37`) |
 | V15.1.2 | SBOM from trusted sources | met | SPDX SBOM attested per release (`.github/workflows/release.yml:110-122`); installs use the lockfile |
 | V15.1.3 | Document resource-heavy functions | met | `spec/api.md` Limits; signature and cold-start costs in `docs/cloudflare.md` |
 | V15.2.1 | Components within those time frames | met | The OSV scan fails on known vulnerabilities (`.github/workflows/security.yml:35-37`) |
