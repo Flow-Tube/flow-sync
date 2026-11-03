@@ -17,6 +17,28 @@ Without live features, the apps hide "Play on" and remote control unless the dev
 
 The Docker image is built and run in CI. Cloudflare Workers, Vercel and Netlify were deployed by the maintainer on 31 October 2026 and work. Heroku, Railway, Render and Fly.io are templates tested against the same image, but haven't been deployed to their hosts yet. Each guide says what was verified.
 
+## Use a release
+
+Deploy a release, not `main`, which can hold changes no app speaks yet.
+
+The Docker guide downloads its files from the latest release. For hosts you deploy from a clone (Cloudflare Workers, Heroku, Fly.io), check out the latest release tag:
+
+```sh
+git clone https://github.com/Flow-Tube/flow-sync && cd flow-sync
+git checkout "$(git describe --tags --abbrev=0 origin/main)"
+```
+
+Hosts that build from a repository (Vercel, Netlify, Railway, Render) deploy a branch of your fork. Fork the repository, push a `release` branch at the latest tag, and deploy that branch:
+
+```sh
+git clone https://github.com/<you>/flow-sync && cd flow-sync
+git remote add upstream https://github.com/Flow-Tube/flow-sync
+git fetch upstream --tags
+git push origin "$(git describe --tags --abbrev=0 upstream/main)^{commit}:refs/heads/release"
+```
+
+To update, run the last two commands again (or `git fetch --tags` and the `checkout` in a clone), then redeploy.
+
 Settings shared by every host (admin token, quota, security contact) are listed in the [Docker guide](../deploy/docker/README.md#settings).
 
 [recovery.md](recovery.md) covers losing devices, the recovery key, or the server.

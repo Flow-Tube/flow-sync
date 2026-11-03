@@ -4,7 +4,7 @@ The Docker image on a web dyno, with everything stored in Heroku Postgres. Herok
 
 ## Deploy
 
-With the Heroku CLI and Docker:
+From a clone at the latest release tag ([how](README.md#use-a-release)), with the Heroku CLI and Docker:
 
 ```sh
 heroku create <app> --stack container
