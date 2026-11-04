@@ -2,6 +2,7 @@ import {
   buildEntry,
   type Entry,
   epochDraft,
+  groupId,
   type MemberSecrets,
   memberSecrets,
   memberSubject,
@@ -67,7 +68,7 @@ test("two devices pair, sync, survive a hostile store, remove and recover", asyn
   const words = recoveryWords(randomBytes(32));
   const recovery = recoveryKeys(recoverySecret(words));
   const a = new SimDevice(base, newKeys());
-  a.group = randomBytes(16);
+  a.group = groupId(a.keys, recovery);
   const k0 = randomBytes(32);
   const genesis = buildEntry(
     a.group,

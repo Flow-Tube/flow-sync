@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { envelopeVectors } from "./envelope.ts";
 import type { Vectors } from "./fixtures.ts";
+import { forkVectors } from "./forks.ts";
 import { keyVectors, recoveryVectors } from "./keys.ts";
 import { lanVectors, pairingVectors } from "./pairing.ts";
 import {
@@ -25,6 +26,7 @@ export async function buildVectors(): Promise<Record<string, Vectors>> {
     recovery: recoveryVectors(),
     envelope: envelopeVectors(),
     roster: rosterVectors(),
+    forks: forkVectors(),
     pairing: pairingVectors(),
     lan: lanVectors(),
   };

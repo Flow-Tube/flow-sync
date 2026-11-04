@@ -107,12 +107,12 @@ A group can live on its devices alone, with no store: its location is `{"k":"lan
 
 - **Creating.** A device writes the genesis entry and its wraps locally. Nothing is claimed.
 - **Holding.** Every device keeps every roster entry it has seen (fork candidates under their [store names](store.md#layout)), every wrap and chain box, and every log object and blob it has fetched, and serves them with the requests above.
-- **Appending.** A device writes the wraps and then the entry locally; the entry spreads as other devices pull `roster`. Concurrent entries resolve by the [fork rule](protocol.md#forks): a peer whose winning chain doesn't contain the asker's head answers `roster` with everything, so both see every candidate even when they pull at the same moment.
+- **Appending.** A device writes the wraps and then the entry locally; the entry spreads as other devices pull `roster`. Concurrent entries settle by the [fork rule](protocol.md#forks): a peer whose winning chain doesn't contain the asker's head answers `roster` with everything, so both see every candidate even when they pull at the same moment.
 - **Pairing.** Pairing always runs over the LAN. The member's `welcome` carries `{"k":"lan"}`, and also `entries` (every roster entry up to the head it names) and `wrap` (b64, the new device's wrap of the current epoch): the new device needs both before it can verify the roster or open a LAN session, which starts with `P_e,lan`. After `done`, the member waits up to 5 seconds for the scanner to close the pairing connection, then the devices sync as below.
 - **Leaving.** A device that appends a `leave` entry meets every member it can reach, for up to 10 seconds, so they pull the entry before it forgets the group. A member it couldn't reach stays listed until another device removes it.
 - **Syncing.** When two members meet, through mDNS or a remembered address, each one pulls from the other: `roster` after its head, the wraps and chain boxes it lacks, then `list` with its version vector and `get` for what it lacks. It merges what it read as from any store, and writes its own objects locally only.
 
-Groups on a store sync the same way when their devices meet, as well as through the store.
+Groups on a store sync the same way when their devices meet, as well as through the store. For the roster, the store's answer decides while it answers ([protocol.md](protocol.md#what-a-device-does-with-a-stores-answer)).
 
 ### Platform notes
 

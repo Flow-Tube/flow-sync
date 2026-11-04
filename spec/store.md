@@ -90,7 +90,7 @@ When pairing through a store, the member opens a slot and each side writes its m
 
 ### Flow server
 
-The server stores this layout behind its API, indexes objects by sender and `seq`, and offers one cursor over all new objects. It linearizes roster appends, so roster forks can't happen there.
+The server stores this layout behind its API, indexes objects by sender and `seq`, and offers one cursor over all new objects. It linearizes roster appends, so honest roster forks can't happen there, and a device treats a changed history as misbehaviour ([protocol.md](protocol.md#what-a-device-does-with-a-stores-answer)).
 
 ### S3-compatible
 

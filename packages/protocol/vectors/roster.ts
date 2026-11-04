@@ -330,6 +330,28 @@ function forks(entries: Chain) {
   ];
 }
 
+/** A genesis whose group id isn't the one its keys commit to. */
+function geneses() {
+  const device = memberSecrets(rand("rival device sig"), rand("rival device kem"));
+  const rival = memberSecrets(rand("rival recovery sig"), rand("rival recovery kem"));
+  return [
+    {
+      name: "group-id-from-other-keys",
+      entry: entry(
+        undefined,
+        {
+          op: "genesis",
+          signer: did(device),
+          add: [subject(device, "device"), subject(rival, "recovery")],
+          epoch: epochDraft(rand("rival epoch"), group, 0, [device, rival]),
+        },
+        [device, rival],
+      ),
+      error: "roster-group",
+    },
+  ];
+}
+
 function metaContents(entries: Entry[]) {
   return entries.flatMap((e) => {
     const epoch = replayRoster(entries.slice(0, e.seq + 1)).epoch;
@@ -352,5 +374,6 @@ export function rosterVectors(): Vectors {
     states: entries.map((_, i) => stateView(replayRoster(entries.slice(0, i + 1)))),
     negatives: negatives(entries),
     forks: forks(entries),
+    geneses: geneses(),
   };
 }

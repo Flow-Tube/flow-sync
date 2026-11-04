@@ -4,6 +4,7 @@ import {
   epochDraft,
   fromB64,
   fromHex,
+  groupId,
   type MemberSecrets,
   memberSecrets,
   memberSubject,
@@ -21,9 +22,9 @@ export const newDevice = () => memberSecrets(randomBytes(32), randomBytes(32));
 
 /** A fresh group with one device and a recovery key, ready to claim an instance. */
 export async function genesis() {
-  const group = randomBytes(16);
   const device = newDevice();
   const recovery = recoveryKeys(randomBytes(32));
+  const group = groupId(device, recovery);
   const epochKey = randomBytes(32);
   const entry = buildEntry(
     group,

@@ -40,6 +40,10 @@ describe("roster", () => {
       const base = stateAfter(n.base);
       await expectCode(() => applyEntry(base, parseEntry(n.entry)), n.error);
     });
+  for (const n of v.geneses)
+    test(n.name, async () => {
+      await expectCode(() => applyEntry(undefined, parseEntry(n.entry)), n.error);
+    });
   test("device names open with the roster key of their epoch", () => {
     for (const m of v.meta) {
       const box = fromB64((entries[m.seq] as Entry).meta?.[m.did] ?? "");

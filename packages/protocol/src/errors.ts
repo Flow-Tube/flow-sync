@@ -16,6 +16,7 @@ export type ErrorCode =
   | "key-commitment"
   | "x25519"
   | "roster-format"
+  | "roster-group"
   | "roster-chain"
   | "roster-op"
   | "roster-signer"

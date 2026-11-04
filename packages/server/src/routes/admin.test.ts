@@ -1,7 +1,17 @@
-import { sha256, toHex } from "@flow-sync/protocol";
+import {
+  buildEntry,
+  canonical,
+  entryHash,
+  epochDraft,
+  type Json,
+  memberSubject,
+  randomBytes,
+  sha256,
+  toHex,
+} from "@flow-sync/protocol";
 import { describe, expect, test } from "vitest";
 import { claimedApp, testApp } from "../testing/app.ts";
-import { genesis, signIn } from "../testing/group.ts";
+import { genesis, newDevice, signIn } from "../testing/group.ts";
 import { ADMIN_TOKEN, bearer, postJson } from "../testing/http.ts";
 import { objectUrl, putBytes, sealedObject } from "../testing/objects.ts";
 
@@ -53,6 +63,43 @@ describe("admin", () => {
       postJson({ entry: next.entry, wraps: next.wraps }, ADMIN_TOKEN),
     );
     await expect(signIn(other.app, next.device, next.group)).resolves.toBeTypeOf("string");
+  });
+
+  test("an instance holding a group id the current rule refuses can be reset", async () => {
+    const h = testApp();
+    const device = newDevice();
+    const recovery = newDevice();
+    const group = randomBytes(16);
+    const entry = buildEntry(
+      group,
+      undefined,
+      {
+        op: "genesis",
+        signer: toHex(device.did),
+        add: [memberSubject(device, "device"), memberSubject(recovery, "recovery")],
+        epoch: epochDraft(randomBytes(32), group, 0, [device, recovery]),
+      },
+      [device, recovery],
+    );
+    await h.storage.meta.appendRoster({
+      seq: 0,
+      prev: undefined,
+      hash: toHex(entryHash(entry)),
+      entry: canonical(entry as Json),
+      keys: [],
+    });
+    expect((await h.app.request("/v1/admin/usage", bearer(ADMIN_TOKEN))).status).toBe(400);
+    const reset = await h.app.request(
+      "/v1/admin/reset",
+      postJson({ confirm: "reset" }, ADMIN_TOKEN),
+    );
+    expect(reset.status).toBe(204);
+    const next = await genesis();
+    const claim = await h.app.request(
+      "/v1/claim",
+      postJson({ entry: next.entry, wraps: next.wraps }, ADMIN_TOKEN),
+    );
+    expect(claim.status).toBe(201);
   });
 
   test("admin routes are closed when admin access is off", async () => {

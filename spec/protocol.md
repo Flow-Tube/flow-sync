@@ -13,7 +13,7 @@ An entry is a canonical JSON object:
 | Field | Type | Present | Meaning |
 |---|---|---|---|
 | `v` | int | always | `2` |
-| `group` | hex | always | The 16-byte group id |
+| `group` | hex | always | The 16-byte [group id](crypto.md#group-id) |
 | `seq` | int | always | 0 for genesis, then +1 per entry |
 | `prev` | hex | always | SHA-256 of the previous entry; 32 zero bytes for genesis |
 | `op` | string | always | `genesis`, `add`, `remove`, `leave`, `rotate`, `rename`, `restore` or `recovery` |
@@ -34,7 +34,7 @@ Absent fields are omitted, never `null` or empty.
 
 A device keeps the roster state: the last `seq` and hash, the current epoch `n` and `kc`, and the members (`did`, keys, role, and for the recovery member whether it has been used), and whether a device has left since the current epoch started, so a `rotate` is due. An entry is valid against that state when all of these hold:
 
-1. `v` is 2, `group` matches, `seq` is the last `seq` + 1, and `prev` is the last hash. Genesis has `seq` 0 on an empty state.
+1. `v` is 2, `group` matches, `seq` is the last `seq` + 1, and `prev` is the last hash. Genesis has `seq` 0 on an empty state, and its `group` is the id its subjects commit to ([crypto.md](crypto.md#group-id)).
 2. `signer` is a current member, and `sigs[signer]` verifies under its key.
 3. Every subject in `add` has `did = Hash("device", sig ‖ kem)[0..16]`, a valid Ed25519 public key ([crypto.md](crypto.md#ed25519-checks)), a `did` never seen before in this roster, and a valid `sigs[did]`. That reverse signature proves the subject agreed to join.
 4. The `op` rules hold:
@@ -59,13 +59,34 @@ A device can use epoch `e` only after unwrapping `K_e` from its own wrap and che
 
 The Flow server appends linearly: an append names the current head and fails if another append got there first.
 
-WebDAV, S3 and LAN peers can't do that, so two devices may append at the same `seq`. Entries are stored under names that include their hash, so both survive, and every device picks the same winner:
+WebDAV, S3 and LAN peers can't do that, so two devices may append at the same `seq`. Entries are stored under names that include their hash, so both survive. Every device settles the roster from all the entries it holds, including every entry it has already applied, and the result depends only on which entries it holds, not on the order it read them.
 
-1. Only entries valid against the state before them count.
-2. Lowest rank wins: `remove` 0, `leave` 1, `recovery` 2, `restore` 3, `rotate` 4, `add` 5, `rename` 6. Removal wins so a revoked device can't win with a concurrent entry. `leave` comes next, so an entry that starts an epoch at the same `seq` is re-applied on top of it and leaves the departed device out. `rotate` comes after the other entries that start an epoch, because any of them makes it unnecessary.
-3. For equal rank, the lowest entry hash (as bytes) wins.
+Only entries valid against the chain from genesis to their own `prev` count. A roster with more than 4096 such entries is refused. Among those:
 
-Losing entries, and everything built on them, are ignored. A device whose entry lost re-applies its change on top of the winner.
+1. An entry `y` *revokes* an entry `x` when `y.remove` names `x.signer`, and `x` is neither `y` nor an ancestor of `y`. So a removal is final whichever branch holds it, and the entries a remover built on stay valid. A `recovery` entry revokes in the same way, since it removes the old recovery member.
+2. An entry *falls* when an entry that stands revokes it, or when its parent falls. It *stands* when its parent stands (a genesis has none) and every entry that revokes it has fallen. These are applied until nothing changes. An entry left undecided is *contested*.
+3. If nothing is contested, the chain is picked from genesis, one `seq` at a time, among the standing children of the entry picked before. Lowest rank wins: `remove` 0, `leave` 1, `recovery` 2, `restore` 3, `rotate` 4, `add` 5, `rename` 6, `genesis` 7. Removal wins so a revoked device can't win with a concurrent entry. `leave` comes next, so an entry that starts an epoch at the same `seq` is re-applied on top of it and leaves the departed device out. `rotate` comes after the other entries that start an epoch, because any of them makes it unnecessary.
+4. For equal rank, the lowest entry hash (as bytes) wins.
+
+Losing entries, and everything built on them, are ignored. A device whose entry lost re-applies its change on top of the winner. A device that holds a verified genesis never replaces it, whatever else it holds.
+
+#### Contested rosters
+
+A contested roster has no winner the protocol can name, because each side validly removes the other. A device that holds one pauses sync, reads and writes both, stays on the chain it had applied, deletes nothing, and asks the user which side to keep. The sides are the contested entries that revoke another contested entry. The device stores the chosen entry's hash in a local list. A listed entry can't be revoked, so the roster settles and sync resumes. The list never leaves the device, so each device asks for itself.
+
+#### What a device does with a store's answer
+
+The device compares the chain it has applied with the chain settled from the store's answer and what it holds:
+
+| Case | What the device does |
+|---|---|
+| The settled chain extends the applied one | Applies the new entries |
+| An applied entry is missing from the store's answer | Stops writing and warns that the store rolled back |
+| The settled chain differs from the applied one, on WebDAV, S3 or a LAN group | Returns to the last common entry and applies the settled chain |
+| The settled chain differs from the applied one, on a Flow server | Stops writing and warns: a linear store has no honest way to do this |
+| The roster is contested | Pauses and asks, as above |
+
+On a Flow server the server's answer decides while it answers. Entries that arrived from LAN peers are held, but they don't count against it. While it doesn't answer, the device settles from what it holds, and a later answer that disagrees is the Flow server case above.
 
 A device MUST NOT seal anything under an epoch its own entry started until it has re-read that `seq` from the store and found its entry still winning. Other devices adopt an epoch only once they see the winning entry.
 
@@ -139,7 +160,7 @@ Any remaining device can remove one or more devices, including one that is lost:
 
 Old objects are not re-encrypted: the removed device already had them. They leave through garbage collection.
 
-A device that finds itself missing from a roster it has verified deletes its device keys and the group's epoch keys, and stops syncing. On a Flow server it can no longer read the roster: once the server refuses it a token, it stops syncing and tells the user, who can forget the group, which deletes the same keys.
+A device that finds itself missing from a settled roster stops syncing and tells the user. It deletes its device keys and the group's epoch keys by itself only when the entry that removes it extends the chain it had applied and nothing is contested. In any other case it deletes them only when the user confirms. On a Flow server it can no longer read the roster: once the server refuses it a token, it stops syncing and tells the user, who can forget the group, which deletes the same keys.
 
 ## Leaving
 
@@ -181,7 +202,7 @@ A reader keeps, per sender, the last `seq` and hash it verified:
 - A gap means the store is withholding, or hasn't caught up. The reader waits; it doesn't skip.
 - A device that has never read a sender starts at its first object (`seq` 1, `prev` all zeros), or right after the sender's entry in the version vector of the snapshot it bootstraps from ([several links](#reading-a-link-from-its-snapshot)). A store therefore can't hide the beginning of a log.
 
-A device that sees the roster head, or any sender's `seq`, go backwards stops writing and warns that the store rolled back.
+A device that sees any sender's `seq` go backwards stops writing and warns that the store rolled back. For the roster, see [What a device does with a store's answer](#what-a-device-does-with-a-stores-answer).
 
 ### Change batches
 
