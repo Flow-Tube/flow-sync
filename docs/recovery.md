@@ -25,7 +25,7 @@ Your data is safe while any device is linked. On a linked device, open Linked de
 
 ## Someone else may have your words
 
-Replace the words from a linked device (above) before they use them: the old words then can't restore the group or read anything synced afterwards. Data synced before the replacement stays readable to anyone with the old words who can still read the store's files, for example with a WebDAV folder's password.
+Replace the words from a linked device (above) before they use them: the old words then can't restore the group or read anything your devices sync once they have the new key. Data synced before that stays readable to anyone with the old words who can still read the store's files, for example with a WebDAV folder's password. This includes changes a device made before it picked up the new key, for example while offline.
 
 If they restored first, your devices list a device you don't know. Remove it, then replace the recovery words, because their restore gave them a recovery key of their own.
 
