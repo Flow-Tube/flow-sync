@@ -35,7 +35,7 @@ The first `play` or `cmd` from a device asks the user on the receiving device: a
 
 `GET /v1/live` upgrades to a WebSocket. The token travels as a subprotocol, `Sec-WebSocket-Protocol: flow-sync.v1, bearer.<token>`, and the server answers `flow-sync.v1`.
 
-- Binary frames are envelopes. The server checks the length (at most 64 KiB), the group, that the sender is the token's device, and the signature. It then forwards the frame to the group's other connections and keeps nothing.
+- Binary frames are envelopes. The server checks the length (at most 64 KiB), the group, that the sender is the token's device, and the signature. It then forwards the frame to the group's other connections and keeps nothing. A frame from an epoch before the current one isn't forwarded, and its sender stays connected: it hasn't seen the entry that started the current epoch, and `changed` makes it sync. A frame from a later epoch, or one that fails a check, closes the connection.
 - Text frames come only from the server: `{"type":"peers","online":["<did>", …]}` whenever the set of connected devices changes, and `{"type":"changed"}` to every other device of the group when one stores a log object, blob or roster entry. A device that has the app open syncs soon after `changed`, so changes reach it without polling.
 - Clients ping every 15 seconds. The server checks its connections at least every 15 seconds and closes any whose token has expired or whose device was removed. Clients reconnect with a fresh token.
 - Per device: at most 20 messages per second and 2 connections.
