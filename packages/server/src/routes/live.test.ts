@@ -92,6 +92,33 @@ describe("live relay", () => {
     expect(await again.closed).toBe(1008);
   });
 
+  test("a message from an earlier epoch reaches no one and keeps its sender connected", async () => {
+    const h = await setup();
+    const { joining: leaving } = await addDevice(h, h.tokenA);
+    const { entry, wraps, chain, head, key } = await removal(h, h.tokenA, toHex(leaving.did), [
+      h.joining,
+    ]);
+    expect((await append(h, h.tokenA, { entry, wraps, chain }, head)).status).toBe(201);
+    const a = await connect(h.port, h.tokenA);
+    await a.next();
+    const b = await connect(h.port, h.tokenB);
+    await a.next();
+    await b.next();
+    const message = (counter: number, epoch: number) =>
+      sealedObject(h.device, counter, {
+        group: h.group,
+        epochKey: key,
+        epoch,
+        type: ObjectType.live,
+      });
+    a.socket.send(h.live());
+    const current = message(2, 1);
+    a.socket.send(current);
+    expect(await b.next()).toEqual(current);
+    a.socket.send(message(3, 2));
+    expect(await a.closed).toBe(1008);
+  });
+
   test("a device holds at most two connections", async () => {
     const h = await setup();
     await connect(h.port, h.tokenA);

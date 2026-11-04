@@ -42,19 +42,24 @@ export async function addDevice(h: Harness, token: string) {
   return { joining, res };
 }
 
-/** A new epoch for the device and the recovery member, with its wraps and chain box. */
-async function nextEpoch(h: Harness) {
+/** A new epoch for the device, the recovery member and [others], with its wraps and chain box. */
+async function nextEpoch(h: Harness, others: Harness["device"][] = []) {
   const key = randomBytes(32);
-  const remaining = [h.device, h.recovery];
+  const remaining = [h.device, h.recovery, ...others];
   const wraps: Record<string, string> = {};
   for (const m of remaining)
     wraps[toHex(m.did)] = toB64(await wrapEpochKey(m.kemPublic, h.group, 1, m.did, key));
   return { key, remaining, wraps, chain: toB64(sealChain(key, h.group, 1, h.epochKey)) };
 }
 
-export async function removal(h: Harness, token: string, removed: string) {
+export async function removal(
+  h: Harness,
+  token: string,
+  removed: string,
+  others: Harness["device"][] = [],
+) {
   const state = replayRoster(await entries(h, token));
-  const { key, remaining, wraps, chain } = await nextEpoch(h);
+  const { key, remaining, wraps, chain } = await nextEpoch(h, others);
   const entry = buildEntry(
     h.group,
     state,
