@@ -84,9 +84,11 @@ export class LiveHub {
     try {
       const object = parseObject(data, fromHex(state.group));
       const { header } = object;
-      const valid = header.type === ObjectType.live && header.epoch === state.epoch;
+      const valid = header.type === ObjectType.live && header.epoch <= state.epoch;
       if (!valid || toHex(header.sender) !== from.did) throw new Error("invalid live message");
       if (!(await verifySignature(objectSignature(object, member.sig)))) throw new Error("forged");
+      // Its sender hasn't seen the new epoch yet. Connected, it hears `changed` and syncs.
+      if (header.epoch < state.epoch) return;
     } catch {
       return this.#close(from, POLICY_VIOLATION);
     }
