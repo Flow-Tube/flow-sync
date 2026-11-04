@@ -37,7 +37,6 @@ function validTree(group: string, held: Entry[], genesis?: string): Node[] {
   const nodes = new Map<string, Node>();
   for (const entry of [...held].sort((a, b) => a.seq - b.seq)) {
     const hash = hashOf(entry);
-    if (nodes.size >= MAX_ROSTER_ENTRIES) fail("roster-chain");
     if (nodes.has(hash) || entry.group !== group) continue;
     if (genesis && entry.op === "genesis" && hash !== genesis) continue;
     const parent = entry.op === "genesis" ? undefined : nodes.get(entry.prev);
@@ -60,6 +59,7 @@ function validTree(group: string, held: Entry[], genesis?: string): Node[] {
     } catch (error) {
       if (!(error instanceof FlowSyncError)) throw error;
     }
+    if (nodes.size > MAX_ROSTER_ENTRIES) fail("roster-chain");
   }
   return [...nodes.values()];
 }
