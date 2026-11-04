@@ -17,7 +17,7 @@ export function memberId(sigPublic: Uint8Array, kemPublic: Uint8Array): Uint8Arr
   return labeledHash("device", concat(sigPublic, kemPublic)).subarray(0, 16);
 }
 
-/** The id of a group: it commits to the keys of its genesis, so a store can't write a rival one. */
+/** The id of a group commits to the keys of its genesis (spec/crypto.md, Group id). */
 export function groupId(
   device: Pick<MemberKeys, "sigPublic" | "kemPublic">,
   recovery: Pick<MemberKeys, "sigPublic" | "kemPublic">,
