@@ -33,7 +33,7 @@ Absent fields are omitted, never `null` or empty.
 
 ### Validation
 
-A device keeps the roster state: the last `seq` and hash, the current epoch `n` and `kc`, and the members (`did`, keys, role, and for the recovery member whether it has been used), whether a device has left since the current epoch started, so a `rotate` is due, and for every member it ever had the epoch it was added under, the last epoch it could write under once it is gone, and its `cut` ([store.md](store.md#reading-an-envelope)). An entry is valid against that state when all of these hold:
+A device keeps the roster state: the last `seq` and hash, the current epoch `n` and `kc`, and the members (`did`, keys, role, and for the recovery member whether it has been used and which device set it), whether a device has left since the current epoch started, so a `rotate` is due, and for every member it ever had the epoch it was added under, the last epoch it could write under once it is gone, and its `cut` ([store.md](store.md#reading-an-envelope)). An entry is valid against that state when all of these hold:
 
 1. `v` is 2, `group` matches, `seq` is the last `seq` + 1, and `prev` is the last hash. Genesis has `seq` 0 on an empty state, and its `group` is the id its subjects commit to ([crypto.md](crypto.md#group-id)).
 2. `signer` is a current member, and `sigs[signer]` verifies under its key.
@@ -44,9 +44,9 @@ A device keeps the roster state: the last `seq` and hash, the current epoch `n` 
 |---|---|---|---|---|
 | `genesis` | the device in `add` | `add`: one `device`, one `recovery`; `epoch` with `n` 0 | `remove` | Creates the group |
 | `add` | a device | `add`: one `device` | `remove`, `epoch` | Adds a device |
-| `remove` | a device | `remove`: one or more devices, not the signer; `epoch` | `add` | Removes devices and starts an epoch |
+| `remove` | a device | `remove`: one or more devices, not the signer; `epoch`. When rule 8 applies, `remove` also names the recovery member and `add` has one `recovery` | `add`, unless rule 8 applies | Removes devices and starts an epoch |
 | `leave` | a device, not the last one | `remove`: exactly the signer | `add`, `epoch` | The signer stops being a member ([Leaving](#leaving)) |
-| `rotate` | a device | `epoch` | `add`, `remove` | Starts an epoch for the current members |
+| `rotate` | a device, unless rule 8 applies | `epoch` | `add`, `remove` | Starts an epoch for the current members |
 | `rename` | a device | `meta` for exactly one current device | `add`, `remove`, `epoch` | Changes a name |
 | `restore` | the recovery member, not used yet | `add`: one `device`; `epoch` | `remove` | Adds a device, starts an epoch, marks the recovery member used |
 | `recovery` | a device | `remove`: the current recovery member; `add`: one `recovery`; `epoch` | | Replaces the recovery key and starts an epoch |
@@ -54,6 +54,7 @@ A device keeps the roster state: the last `seq` and hash, the current epoch `n` 
 5. When `epoch` is present, `n` is the current epoch + 1 (0 for genesis), and `to` is exactly the set of members after the entry.
 6. `meta` keys are members after the entry.
 7. `cut` appears only on `remove` and `leave`, isn't empty, and names only devices in `remove`. Each `seq` is from 1 to 2<sup>53</sup> − 1.
+8. The device that set a recovery key is the signer of the `recovery` or `remove` entry that added it. A recovery key from `genesis` has none. While that device isn't a member, or the entry removes it, the key is *due*: a `remove` must replace it, in that same entry, and a `rotate` isn't valid. A `remove` must not replace a key that isn't due.
 
 A device can use epoch `e` only after unwrapping `K_e` from its own wrap and checking it against `kc`. It unwraps first and applies the entry only if that works. Otherwise it stays on the chain it had, stops writing, and retries. A device whose LAN session can't open on the settled chain for this reason opens it on the chain it had, to pull what's missing. A recovery member that has signed a `restore` can never sign again. The restored device MUST replace it with a `recovery` entry right away, which shows the user new words.
 
@@ -160,6 +161,8 @@ Any remaining device can remove one or more devices, including one that is lost:
 3. The server revokes the removed devices' tokens on that append. On WebDAV and S3 the removed device still has what the store allows until [its login is replaced](#replacing-a-stores-login). If it had a login of its own, revoking that is enough.
 4. Soon after, write a new snapshot under `e + 1` for each link it can ([Snapshots](#snapshots)), so new devices don't depend on older epochs.
 
+A device can install things while it is linked, and a removal doesn't undo them on its own. If it set the recovery key, rule 8 replaces the key in the same entry, and the user is shown new words straight after. The removal doesn't wait for them, because removing a stolen device is urgent. Before the removal, the device lists the current devices that the removed ones added, following those devices' additions in turn, and lets the user remove them too. Nothing is removed by default: nearly every device descends from the first one, and the user is the only one who knows which are theirs.
+
 Old objects are not re-encrypted: the removed device already had them. They leave through garbage collection.
 
 The `cut` is where that device's log ends. Readers stop there, so what it writes after its removal is never read ([store.md](store.md#reading-an-envelope)). A removed device with no `cut` has no objects anyone reads from then on. A device that had already read past the `cut` keeps what it applied. Objects above the `cut` that the signer hadn't read are dropped, so the user is told that recent changes from that device may not arrive. When a fork holds two removals of a device, the `cut` of the entry on the chain decides.
@@ -184,8 +187,9 @@ A device can't sign its own `remove`, and must never hold the key of the epoch t
 
 1. The leaving device appends a `leave` entry signed by itself, with only its own `did` in `remove`, and its own last object as `cut` if it wrote any. The last device of a group can't leave; it can only forget the group.
 2. The server revokes its tokens on that append. The device then deletes its device keys, the group's epoch keys and everything it stored for the group. On WebDAV and S3, the user should also revoke its login if it had its own.
-3. A device that sees a `leave` not yet followed by an entry that starts an epoch appends a `rotate` before it writes any new object: it generates `K_(e+1)`, writes a wrap for each current member, including the recovery member, and the history chain box, and appends `rotate` with `epoch` `n = e + 1`. Devices that rotate at the same time make a fork, resolved as above; a device whose `rotate` lost adopts the winner's epoch and doesn't rotate again.
-4. The device that rotated writes new snapshots under `e + 1` soon after, as after a removal.
+3. If the device that left had set the recovery key, that key is due (rule 8), and no background step can show new words. So devices keep reading, write nothing, and ask the user for new words. The `recovery` entry starts the epoch. A user who is leaving a device that set the key is told this first.
+4. Otherwise, a device that sees a `leave` not yet followed by an entry that starts an epoch appends a `rotate` before it writes any new object: it generates `K_(e+1)`, writes a wrap for each current member, including the recovery member, and the history chain box, and appends `rotate` with `epoch` `n = e + 1`. Devices that rotate at the same time make a fork, resolved as above; a device whose `rotate` lost adopts the winner's epoch and doesn't rotate again.
+5. The device that rotated writes new snapshots under `e + 1` soon after, as after a removal.
 
 From its `leave` on, the device counts as removed everywhere in this document: its acks no longer hold back garbage collection, and any current device may delete its objects. To join again it pairs with new device keys, so it gets a new `did` and a new log.
 
@@ -201,9 +205,9 @@ To restore onto a new device, the user enters the words and the store location (
 4. Immediately creates a new recovery key, appends a `recovery` entry, and shows the new words.
 5. Reads every log, then links its Default profile like a `welcome` would. When change batches and snapshot manifests name one link for profile data, it joins that link; when they name none, it starts a link with its own profile id; when they name several, the user picks one from the `profiles` records, or starts a new link. It writes no batch before that.
 
-Every other device shows that the group was restored with the recovery key, and when.
-
 Any device can append a `recovery` entry at any time, for example after losing the words. The old recovery member stops receiving epoch keys.
+
+Every other device tells the user when it applies a `restore`, a `recovery` entry, or a `remove` that replaces the key, signed by another device: which device or recovery key did it, and when this device learned of it, since the words the user holds may have just stopped working. The notice stays until answered. If the user didn't do it, the answer leads to removing that device.
 
 ## Sync
 

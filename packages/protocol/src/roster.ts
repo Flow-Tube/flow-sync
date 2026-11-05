@@ -63,6 +63,8 @@ export interface Member {
   kem: Uint8Array;
   role: Subject["role"];
   used: boolean;
+  /** For a recovery member from a `recovery` or `remove` entry: the device that signed it. */
+  installer?: string;
 }
 
 /** A member of any time: what step 2 of reading an envelope checks a sender against. */
@@ -85,6 +87,8 @@ export interface RosterState {
   kc: string;
   /** A device left during this epoch, so the next device to write must append a rotate first. */
   rotate: boolean;
+  /** The device that set the recovery key is gone, so it must be replaced before anything is written. */
+  recoveryDue: boolean;
   members: ReadonlyMap<string, Member>;
   senders: ReadonlyMap<string, Sender>;
 }
@@ -117,10 +121,10 @@ const sameSet = (a: string[], b: Iterable<string>) => {
 };
 
 /** The op table from protocol.md: which fields each op requires and forbids. */
-const OPS: Record<Op, { add: number | "none"; remove: boolean; epoch: boolean }> = {
+const OPS: Record<Op, { add: number | "none" | "optional"; remove: boolean; epoch: boolean }> = {
   genesis: { add: 2, remove: false, epoch: true },
   add: { add: 1, remove: false, epoch: false },
-  remove: { add: "none", remove: true, epoch: true },
+  remove: { add: "optional", remove: true, epoch: true },
   leave: { add: "none", remove: true, epoch: false },
   rotate: { add: "none", remove: false, epoch: true },
   rename: { add: "none", remove: false, epoch: false },
@@ -131,7 +135,9 @@ const OPS: Record<Op, { add: number | "none"; remove: boolean; epoch: boolean }>
 function checkShape(entry: Entry): void {
   const rule = OPS[entry.op];
   const added = entry.add?.length ?? 0;
-  if (rule.add === "none" ? added !== 0 : added !== rule.add) fail("roster-op");
+  if (rule.add === "none" ? added !== 0 : rule.add !== "optional" && added !== rule.add) {
+    fail("roster-op");
+  }
   if (rule.remove !== (entry.remove !== undefined)) fail("roster-op");
   if (rule.epoch !== (entry.epoch !== undefined)) fail("roster-op");
   if (entry.cut) {
@@ -145,7 +151,7 @@ function checkShape(entry: Entry): void {
   const expected =
     entry.op === "genesis"
       ? ["device", "recovery"]
-      : entry.op === "recovery"
+      : entry.op === "recovery" || entry.op === "remove"
         ? ["recovery"]
         : ["device"];
   if (added > 0 && roles.join() !== expected.join()) fail("roster-op");
@@ -157,6 +163,26 @@ function checkSubject(subject: Subject, senders: ReadonlyMap<string, Sender>): M
   if (!isValidSigningKey(sig)) fail("roster-key");
   if (toHex(memberId(sig, kem)) !== subject.did || senders.has(subject.did)) fail("roster-key");
   return { sig, kem, role: subject.role, used: false };
+}
+
+const recoveryMember = (members: ReadonlyMap<string, Member>) =>
+  [...members].find(([, member]) => member.role === "recovery");
+
+/** The current recovery key was set by a device that is gone, or goes with `removed`. */
+function installerGone(members: ReadonlyMap<string, Member>, removed: readonly string[] = []) {
+  const installer = recoveryMember(members)?.[1].installer;
+  return installer !== undefined && (!members.has(installer) || removed.includes(installer));
+}
+
+/** A removal replaces the recovery key exactly when the device that set it is gone. */
+function checkReplacement(entry: Entry, state: RosterState | undefined): void {
+  if (entry.op === "rotate" && state?.recoveryDue) fail("roster-op");
+  if (entry.op !== "remove" || !state) return;
+  const required = installerGone(state.members, entry.remove);
+  const current = recoveryMember(state.members)?.[0] as string;
+  if (required !== (entry.add !== undefined) || required !== entry.remove?.includes(current)) {
+    fail("roster-op");
+  }
 }
 
 function checkGroupId(entry: Entry): void {
@@ -207,6 +233,7 @@ export function checkEntry(
   }
   checkShape(entry);
   if (entry.op === "genesis") checkGroupId(entry);
+  checkReplacement(entry, state);
 
   const senders = new Map(state?.senders);
   const added = new Map<string, Member>();
@@ -225,10 +252,10 @@ export function checkEntry(
   const members = new Map(state?.members);
   for (const id of entry.remove ?? []) {
     const member = members.get(id);
-    const wanted = entry.op === "recovery" ? "recovery" : "device";
-    if (!member || member.role !== wanted || (id === entry.signer) !== (entry.op === "leave")) {
-      fail("roster-op");
-    }
+    if (!member || (id === entry.signer) !== (entry.op === "leave")) fail("roster-op");
+    const wanted = entry.op === "recovery" || (entry.add && entry.op === "remove");
+    if (member.role === "recovery" ? !wanted : entry.op === "recovery") fail("roster-op");
+    if (member.role === "recovery" && entry.cut?.[id]) fail("roster-op");
     members.delete(id);
     const cut = entry.cut?.[id];
     senders.set(id, {
@@ -243,7 +270,12 @@ export function checkEntry(
   if (entry.op === "restore") members.set(entry.signer, { ...signer, used: true });
   const epoch = entry.epoch ? entry.epoch.n : (state?.epoch ?? 0);
   for (const [id, member] of added) {
-    members.set(id, member);
+    members.set(
+      id,
+      member.role === "recovery" && entry.op !== "genesis"
+        ? { ...member, installer: entry.signer }
+        : member,
+    );
     senders.set(id, { sig: member.sig, role: member.role, since: epoch });
   }
 
@@ -273,6 +305,7 @@ export function checkEntry(
       epoch,
       kc: entry.epoch?.kc ?? (state?.kc as string),
       rotate: entry.op === "leave" || (!entry.epoch && (state?.rotate ?? false)),
+      recoveryDue: installerGone(members),
       members,
       senders,
     },

@@ -38,7 +38,7 @@ No system is attack-proof. FLOW-SYNC/2 aims for defence in depth, and for a comp
 ## Non-goals
 
 - **N1** Hiding from the store that a sync happened, or its rough size. Padding reduces what sizes reveal. An object's type is in the clear, so a store also sees that a login was replaced.
-- **N2** Protecting against a device that is still linked and compromised. Removing it restores G1 for later data.
+- **N2** Protecting against a device that is still linked and compromised. Removing it restores G1 for later data, provided whatever it installed goes with it: a recovery key it set is replaced by the removal, and devices it added are removed only if the user picks them. A device that set the key and then left stops the others writing until the words are replaced.
 - **N3** Protecting a server from a host that already controls it. G1 still holds, because the server never sees keys.
 
 ## Assumptions
@@ -52,7 +52,7 @@ No system is attack-proof. FLOW-SYNC/2 aims for defence in depth, and for a comp
 
 | Lost or stolen | Effect | Response |
 |---|---|---|
-| One device | The thief reads what that device had | Remove it from another device: new epoch, server revokes it |
+| One device | The thief reads what that device had. While it is linked, it can also set the recovery key and add devices | Remove it from another device: new epoch, server revokes it, a recovery key it set is replaced. Remove any devices you don't recognise |
 | Every device, recovery key kept | Nothing lost | Restore onto a new device with the recovery key |
 | Recovery key, devices kept | An attacker with the words can restore once | Make a new recovery key on any device; the old one stops receiving epoch keys |
 | Every device and the recovery key | The data can't be recovered by anyone, including the server operator | None. This follows from G1 and is stated plainly during setup |

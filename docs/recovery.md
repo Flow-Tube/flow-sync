@@ -10,6 +10,10 @@ Creating a group shows a recovery key once: 24 words and a QR code. Flow asks fo
 
 On another device, open Linked devices, pick the lost one and choose Remove. The remaining devices switch to a new group key and the server shuts the lost device out at once. Whatever it had already synced stays on it. If it turns up again, it shows that it was removed and stops syncing (on Android, forget the group there first); then you can link it again.
 
+If that device set the current recovery words, Flow replaces them in the same step and shows you new ones, so write them down. Flow also lists the devices the lost one added: remove any you don't recognise. Changes the lost device made that your other devices hadn't read yet may not arrive.
+
+If a device replaces the recovery words and you didn't ask it to, your other devices tell you. Remove that device. If it also left the group, your devices stop syncing changes until you make new words on one of them.
+
 ## You lost every device, but have the words
 
 1. Install Flow on a new device and open Linked devices.
@@ -27,7 +31,7 @@ Your data is safe while any device is linked. On a linked device, open Linked de
 
 Replace the words from a linked device (above) before they use them: the old words then can't restore the group or read anything your devices sync once they have the new key. Data synced before that stays readable to anyone with the old words who can still read the store's files, for example with a WebDAV folder's password. This includes changes a device made before it picked up the new key, for example while offline.
 
-If they restored first, your devices list a device you don't know. Remove it, then replace the recovery words, because their restore gave them a recovery key of their own.
+If they restored first, your devices tell you, and list a device you don't know. Remove it. Flow replaces their recovery key in the same step and shows you new words.
 
 ## You lost every device and the words
 
