@@ -282,6 +282,7 @@ export function forkVectors(): Vectors {
       return {
         outcome: settled.outcome,
         chain: settled.chain.map(nameOf),
+        standing: settled.standing.map(nameOf).sort(),
         extendsApplied: settled.extendsApplied,
       };
     }
