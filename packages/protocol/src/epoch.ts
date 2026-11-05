@@ -3,7 +3,15 @@ import { concat, equalBytes, u32 } from "./bytes.ts";
 import { fail } from "./errors.ts";
 import { derive, tag } from "./kdf.ts";
 
-export type Purpose = "roster" | "changes" | "snapshot" | "ack" | "live" | "lan" | "chain" | "store";
+export type Purpose =
+  | "roster"
+  | "changes"
+  | "snapshot"
+  | "ack"
+  | "live"
+  | "lan"
+  | "chain"
+  | "store";
 
 export function epochCommitment(epochKey: Uint8Array, group: Uint8Array, epoch: number) {
   return derive(epochKey, group, "epoch", u32(epoch), 32);

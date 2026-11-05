@@ -5,7 +5,13 @@ import type { Purpose } from "./epoch.ts";
 import { fail } from "./errors.ts";
 import { sha256, tag } from "./kdf.ts";
 
-export const ObjectType = { changes: 0x01, snapshot: 0x02, ack: 0x03, login: 0x04, live: 0x10 } as const;
+export const ObjectType = {
+  changes: 0x01,
+  snapshot: 0x02,
+  ack: 0x03,
+  login: 0x04,
+  live: 0x10,
+} as const;
 export type ObjectType = (typeof ObjectType)[keyof typeof ObjectType];
 
 const PURPOSE: Record<ObjectType, Purpose> = {
