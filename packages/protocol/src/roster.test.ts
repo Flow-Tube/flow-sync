@@ -4,7 +4,7 @@ import { randomBytes, toHex, utf8 } from "./bytes.ts";
 import { canonical, type Json } from "./canonical.ts";
 import { buildEntry, epochDraft, memberSubject } from "./entries.ts";
 import { FlowSyncError } from "./errors.ts";
-import { memberSecrets } from "./keys.ts";
+import { groupId, memberSecrets } from "./keys.ts";
 import { applyEntry, type Entry, entryHash, parseEntry } from "./roster.ts";
 import { fuzzRuns, mutations, refused } from "./testing/fuzz.ts";
 
@@ -34,9 +34,9 @@ test("arbitrary JSON is rejected as a roster entry with a protocol error", () =>
   );
 });
 
-const group = randomBytes(16);
 const member = () => memberSecrets(randomBytes(32), randomBytes(32));
 const [device, recovery, joiner] = [member(), member(), member()];
+const group = groupId(device, recovery);
 const genesis = buildEntry(
   group,
   undefined,

@@ -5,7 +5,7 @@ import { isValidSigningKey, type SignatureCheck, sign, verify } from "./curve.ts
 import { ZERO_HASH } from "./envelope.ts";
 import { fail } from "./errors.ts";
 import { sha256, tag } from "./kdf.ts";
-import { memberId } from "./keys.ts";
+import { groupId, memberId } from "./keys.ts";
 
 const hex = (bytes: number) => z.string().regex(new RegExp(`^[0-9a-f]{${bytes * 2}}$`));
 const b64 = (bytes: number) => z.string().refine((s) => decodesTo(s, bytes));
@@ -130,6 +130,14 @@ function checkSubject(subject: Subject, seen: ReadonlySet<string>): Member {
   return { sig, kem, role: subject.role, used: false };
 }
 
+function checkGroupId(entry: Entry): void {
+  const keys = (role: Subject["role"]) => {
+    const subject = entry.add?.find((s) => s.role === role) as Subject;
+    return { sigPublic: fromB64(subject.sig), kemPublic: fromB64(subject.kem) };
+  };
+  if (toHex(groupId(keys("device"), keys("recovery"))) !== entry.group) fail("roster-group");
+}
+
 function checkSigner(entry: Entry, state: RosterState | undefined, added: Map<string, Member>) {
   if (entry.op === "genesis") {
     const signer = added.get(entry.signer);
@@ -169,6 +177,7 @@ export function checkEntry(
     fail("roster-chain");
   }
   checkShape(entry);
+  if (entry.op === "genesis") checkGroupId(entry);
 
   const seen = new Set(state?.seen);
   const added = new Map<string, Member>();

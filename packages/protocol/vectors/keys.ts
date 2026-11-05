@@ -1,4 +1,5 @@
 import {
+  chainPath,
   epochCommitment,
   type MemberSecrets,
   type Purpose,
@@ -6,6 +7,7 @@ import {
   recoveryWords,
   sealChain,
   wrapEpochKey,
+  wrapPath,
 } from "../src/index.ts";
 import {
   device,
@@ -36,13 +38,14 @@ export async function keyVectors(): Promise<Vectors> {
   const ikmE = rand("ikmE");
   const wrap = await wrapEpochKey(device.B.kemPublic, group, 3, device.B.did, k, ikmE);
   const chainSalt = rand("chain salt");
+  const commitment = epochCommitment(k, group, 3);
   return {
     members: Object.entries(device).map(([name, m]) => member(name, m)),
     epoch: {
       key: hex(k),
       group: hex(group),
       epoch: 3,
-      commitment: hex(epochCommitment(k, group, 3)),
+      commitment: hex(commitment),
       purposes: Object.fromEntries(PURPOSES.map((p) => [p, hex(purposeKey(k, group, 3, p))])),
     },
     wrap: {
@@ -66,6 +69,13 @@ export async function keyVectors(): Promise<Vectors> {
       previousKey: hex(k0),
       salt: hex(chainSalt),
       box: hex(sealChain(k1, group, 1, k0, chainSalt)),
+    },
+    paths: {
+      epoch: 3,
+      commitment: hex(commitment),
+      did: hex(device.B.did),
+      wrap: wrapPath(3, commitment, hex(device.B.did)),
+      chain: chainPath(3, commitment),
     },
   };
 }

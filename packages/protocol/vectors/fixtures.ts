@@ -1,4 +1,4 @@
-import { derive, EMPTY, memberSecrets, recoveryKeys, toHex, utf8 } from "../src/index.ts";
+import { derive, EMPTY, groupId, memberSecrets, recoveryKeys, toHex, utf8 } from "../src/index.ts";
 
 /** Deterministic stand-in for the CSPRNG, so every run reproduces the same vectors. */
 export function rand(label: string, length = 32): Uint8Array {
@@ -6,7 +6,6 @@ export function rand(label: string, length = 32): Uint8Array {
 }
 
 export const hex = toHex;
-export const group = rand("group", 16);
 export const epochKeys = [0, 1, 2, 3, 4].map((n) => rand(`epoch ${n}`));
 export const device = {
   A: memberSecrets(rand("A sig"), rand("A kem")),
@@ -15,6 +14,7 @@ export const device = {
 };
 export const recoverySecrets = [rand("recovery 1"), rand("recovery 2")];
 export const recovery = recoverySecrets.map(recoveryKeys);
+export const group = groupId(device.A, recovery[0] as (typeof recovery)[number]);
 
 /** Flips one bit so a vector can show the exact check that rejects it. */
 export function flip(bytes: Uint8Array, index: number): Uint8Array {

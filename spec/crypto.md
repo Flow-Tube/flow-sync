@@ -61,6 +61,14 @@ Hash(label, data) = SHA-256("FLOW-SYNC/2 " ‖ label ‖ 0x00 ‖ data)
 
 ## Keys
 
+### Group id
+
+```
+group = Hash("group", device sig_pub ‖ device kem_pub ‖ recovery sig_pub ‖ recovery kem_pub)[0..16]
+```
+
+The keys are those of the `device` and `recovery` subjects of the genesis entry, by role. Both are fresh for each group, so ids don't repeat. A genesis that doesn't match its `group` is invalid, so nobody without those keys can write one for the group.
+
 ### Device keys
 
 Device keys belong to one membership of one group. A device generates fresh ones when it creates a group, joins one (by pairing, including with the admin token) and restores one with the recovery key:
@@ -70,7 +78,7 @@ Device keys belong to one membership of one group. A device generates fresh ones
 
 Its device id is `did = Hash("device", sig_pub ‖ kem_pub)[0..16]`.
 
-A device deletes its device keys, with the group's epoch keys, after it [leaves](protocol.md#leaving) or learns it was [removed](protocol.md#removal). A device that joins again therefore has a new `did`, which the roster accepts because it has never seen it, and starts a new log.
+A device deletes its device keys, with the group's epoch keys, after it [leaves](protocol.md#leaving), or when it is [removed](protocol.md#removal) under the conditions given there. A device that joins again therefore has a new `did`, which the roster accepts because it has never seen it, and starts a new log.
 
 Private keys never leave the device. They are stored encrypted by a platform key: on Android with the existing Keystore AES-GCM helper, on Desktop in the OS keychain.
 
