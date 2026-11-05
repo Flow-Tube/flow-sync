@@ -20,7 +20,7 @@ import {
   type Vectors,
 } from "./fixtures.ts";
 
-const PURPOSES: Purpose[] = ["roster", "changes", "snapshot", "ack", "live", "lan", "chain"];
+const PURPOSES: Purpose[] = ["roster", "changes", "snapshot", "ack", "live", "lan", "chain", "store"];
 
 const member = (name: string, m: MemberSecrets) => ({
   name,

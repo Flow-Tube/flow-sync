@@ -155,19 +155,31 @@ Any remaining device can remove one or more devices, including one that is lost:
 
 1. Generate `K_(e+1)`. Write a wrap for each remaining member, including the recovery member, and the history chain box.
 2. Append a `remove` entry with `epoch` `n = e + 1`, `kc` and `to`.
-3. The server revokes the removed devices' tokens on that append. On WebDAV and S3, the user should also revoke the removed device's credentials if it had its own.
+3. The server revokes the removed devices' tokens on that append. On WebDAV and S3 the removed device still has what the store allows until [its login is replaced](#replacing-a-stores-login). If it had a login of its own, revoking that is enough.
 4. Soon after, write a new snapshot under `e + 1` for each link it can ([Snapshots](#snapshots)), so new devices don't depend on older epochs.
 
 Old objects are not re-encrypted: the removed device already had them. They leave through garbage collection.
 
 A device that finds itself missing from a settled roster stops syncing and tells the user. It deletes its device keys and the group's epoch keys by itself only when the entry that removes it extends the chain it had applied and nothing is contested. In any other case it deletes them only when the user confirms. On a Flow server it can no longer read the roster: once the server refuses it a token, it stops syncing and tells the user, who can forget the group, which deletes the same keys.
 
+## Replacing a store's login
+
+On WebDAV and S3, devices usually share the login `welcome` hands out, and the store can't tell them apart. A removed device that kept it can read, write, overwrite and delete anything there. So on these stores a removal is complete only once the login has changed. The new login has to reach the other devices while the old one still works:
+
+1. **Notice.** From applying a `remove` until it has read a [store login](store.md#store-logins) sealed at that entry's epoch or later, a device tells the user that the removed device can still reach the store. A `leave` doesn't call for it: that device deleted its login. The user can also start a change at any other time.
+2. **Enter.** The user types the new login, before setting it at the provider. The device re-reads the roster, stops if it is contested, and writes a store login to its own log under the current epoch. The user SHOULD do this on the device that made the removal.
+3. **Wait.** The device shows which current devices have read the object, from their acks. The user can go on without one. That device will need the login typed in.
+4. **Change.** The user sets the login at the provider. Where the provider has app passwords, the user creates the new one and then revokes the old one.
+5. **Done.** The device checks the new login against the store and its group id, and saves it.
+
+A device keeps the latest store login it read as a pending login, in the same keystore as its login. When the store refuses its login, it tries the pending one once, checks the group id, and saves it. If the store refuses that too, it stops, as for any refused login ([store.md](store.md#webdav)).
+
 ## Leaving
 
 A device can't sign its own `remove`, and must never hold the key of the epoch that shuts it out. So it leaves with an entry that changes no keys, and the devices that stay start the next epoch:
 
 1. The leaving device appends a `leave` entry signed by itself, with only its own `did` in `remove`. The last device of a group can't leave; it can only forget the group.
-2. The server revokes its tokens on that append. The device then deletes its device keys, the group's epoch keys and everything it stored for the group. On WebDAV and S3, the user should also revoke its credentials if it had its own.
+2. The server revokes its tokens on that append. The device then deletes its device keys, the group's epoch keys and everything it stored for the group. On WebDAV and S3, the user should also revoke its login if it had its own.
 3. A device that sees a `leave` not yet followed by an entry that starts an epoch appends a `rotate` before it writes any new object: it generates `K_(e+1)`, writes a wrap for each current member, including the recovery member, and the history chain box, and appends `rotate` with `epoch` `n = e + 1`. Devices that rotate at the same time make a fork, resolved as above; a device whose `rotate` lost adopts the winner's epoch and doesn't rotate again.
 4. The device that rotated writes new snapshots under `e + 1` soon after, as after a removal.
 

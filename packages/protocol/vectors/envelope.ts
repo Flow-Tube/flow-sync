@@ -39,16 +39,19 @@ export function envelopeVectors(): Vectors {
   const changes = `${canonical({ collection: "likes", head: "00".repeat(32), link: "default" })}\n{"id":"dQw4w9WgXcQ","kind":"video","state":"like"}`;
   const snapshot = canonical({ head: "00".repeat(32), link: "default", parts: [], vv: {} });
   const ack = canonical({ vv: { [hex(A.did)]: 2 } });
+  const login = canonical({ k: "webdav", n: "flow", w: "new password" });
   const live = canonical({ can: ["play", "remote"], type: "presence" });
 
   const first = object(header(ObjectType.changes, 1, ZERO_HASH), changes, rand("salt 1"));
   const second = object(header(ObjectType.snapshot, 2, sha256(first)), snapshot, rand("salt 2"));
   const third = object(header(ObjectType.ack, 3, sha256(second)), ack, rand("salt 3"));
+  const fourth = object(header(ObjectType.login, 4, sha256(third)), login, rand("salt login"));
   const liveMessage = object(header(ObjectType.live, 7, ZERO_HASH), live, rand("salt 4"));
   const cases = [
     { object: first, content: changes, last: undefined },
     { object: second, content: snapshot, last: first },
     { object: third, content: ack, last: second },
+    { object: fourth, content: login, last: third },
     { object: liveMessage, content: live, last: undefined },
   ];
 

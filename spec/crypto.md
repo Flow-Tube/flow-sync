@@ -95,6 +95,7 @@ P_e,x  = Derive(K_e, group, "key " ‖ x, u32(e), 32)       purpose key
 |---|---|
 | `roster` | Device names and platforms in roster entries |
 | `changes` | Change batches |
+| `store` | [Store logins](store.md#store-logins) |
 | `snapshot` | Snapshot manifests and their blobs |
 | `ack` | Acknowledgements |
 | `live` | Live channel messages |
