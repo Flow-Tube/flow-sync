@@ -289,4 +289,4 @@ An object of sender X at `seq` n MAY be deleted when:
 
 A snapshot manifest and its blobs MAY be deleted when a newer snapshot of the same link has a version vector at least as large for every sender, every current device has acked that newer snapshot, and every current device's latest ack has `vv[X] ≥ n` for the manifest's own `seq` n, so no reader meets the gap it leaves. Removed devices don't count.
 
-Garbage collection is done by devices, on every backend: each device deletes only its own objects, and any current device may delete the objects of a removed device. The server can't read acks, so it never decides on its own what to delete.
+Objects of a removed device above its `cut` are never read, so any current device MAY delete them as soon as it sees them. Garbage collection is done by devices, on every backend: each device deletes only its own objects, and any current device may delete the objects of a removed device. The server can't read acks, so it never decides on its own what to delete.
