@@ -404,7 +404,7 @@ function forks(entries: Chain) {
   ];
 }
 
-/** Entries on top of the chain, each case applying `then` in order, the last refused or giving `state`. */
+/** Entries on top of the chain, each case applying `steps` in order, the last refused or giving `state`. */
 function replacements(entries: Chain) {
   const [, , e2, , , , , , e8] = entries;
   const R3 = memberSecrets(rand("R3 sig"), rand("R3 kem"));
@@ -465,33 +465,37 @@ function replacements(entries: Chain) {
   return [
     {
       name: "removing-the-device-that-set-the-key-replaces-it",
-      then: [removeC(true)],
+      steps: [removeC(true)],
       state: view(removeC(true)),
     },
     {
       name: "removing-the-device-that-set-the-key-without-replacing",
-      then: [removeC(false)],
+      steps: [removeC(false)],
       error: "roster-op",
     },
-    { name: "cut-for-the-replaced-key", then: [removeC(true, true)], error: "roster-op" },
-    { name: "the-device-that-set-the-key-left", then: [addE, cLeaves], state: view(addE, cLeaves) },
-    { name: "rotate-while-the-key-is-due", then: [addE, cLeaves, rotated], error: "roster-op" },
+    { name: "cut-for-the-replaced-key", steps: [removeC(true, true)], error: "roster-op" },
+    {
+      name: "the-device-that-set-the-key-left",
+      steps: [addE, cLeaves],
+      state: view(addE, cLeaves),
+    },
+    { name: "rotate-while-the-key-is-due", steps: [addE, cLeaves, rotated], error: "roster-op" },
     {
       name: "removal-while-the-key-is-due-without-replacing",
-      then: [addE, cLeaves, removeE(false)],
+      steps: [addE, cLeaves, removeE(false)],
       error: "roster-op",
     },
     {
       name: "removal-while-the-key-is-due",
-      then: [addE, cLeaves, removeE(true)],
+      steps: [addE, cLeaves, removeE(true)],
       state: view(addE, cLeaves, removeE(true)),
     },
     {
       name: "new-words-after-the-device-left",
-      then: [addE, cLeaves, replaced],
+      steps: [addE, cLeaves, replaced],
       state: view(addE, cLeaves, replaced),
     },
-    { name: "replacement-not-called-for", base: 3, then: [notDue], error: "roster-op" },
+    { name: "replacement-not-called-for", base: 3, steps: [notDue], error: "roster-op" },
   ];
 }
 

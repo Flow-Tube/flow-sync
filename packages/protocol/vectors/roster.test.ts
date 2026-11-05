@@ -61,7 +61,7 @@ describe("roster", () => {
     });
   for (const r of v.replacements)
     test(r.name, async () => {
-      const steps: Entry[] = r.then.map(parseEntry);
+      const steps: Entry[] = r.steps.map(parseEntry);
       const last = steps.pop() as Entry;
       const base = steps.reduce(applyEntry, stateAfter(r.base ?? entries.length));
       if (r.error) await expectCode(() => applyEntry(base, last), r.error);
