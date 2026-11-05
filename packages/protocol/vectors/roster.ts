@@ -83,7 +83,13 @@ function chain(): Chain {
   );
   const e3 = entry(
     e2,
-    { op: "remove", signer: did(A), remove: [did(B)], epoch: epoch(1, [A, R1]) },
+    {
+      op: "remove",
+      signer: did(A),
+      remove: [did(B)],
+      cut: { [did(B)]: { seq: 2, hash: hex(rand("last object of B")) } },
+      epoch: epoch(1, [A, R1]),
+    },
     [A],
   );
   const e4 = entry(
@@ -118,7 +124,7 @@ function chain(): Chain {
     },
     [C, D],
   );
-  const e7 = entry(e6, leaveDraft(D), [D]);
+  const e7 = entry(e6, leaveDraft(D, { seq: 1, hash: hex(rand("last object of D")) }), [D]);
   const e8 = entry(e7, rotate(A, 4, [A, C, R2]), [A]);
   return [e0, e1, e2, e3, e4, e5, e6, e7, e8];
 }
@@ -132,6 +138,15 @@ function stateView(state: RosterState) {
     members: [...state.members.entries()]
       .sort(([a], [b]) => (a < b ? -1 : 1))
       .map(([id, m]) => ({ did: id, role: m.role, used: m.used })),
+    senders: [...state.senders.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([id, s]) => ({
+        did: id,
+        role: s.role,
+        since: s.since,
+        ...(s.until !== undefined && { until: s.until }),
+        ...(s.cut && { cut: s.cut }),
+      })),
   };
 }
 
@@ -144,6 +159,7 @@ function negatives(entries: Chain) {
     kem: toB64(C.kemPublic),
     role: "device",
   };
+  const oneObject = { seq: 1, hash: hex(rand("an object")) };
   const wrongSeq = signEntry(
     { ...entry(e0, { op: "rename", signer: did(A), meta: e0.meta ?? {} }, []), seq: 5 },
     did(A),
@@ -163,6 +179,58 @@ function negatives(entries: Chain) {
       error: "roster-signature",
     },
     { name: "unknown-field", base: 1, entry: { ...e1, extra: 1 }, error: "roster-format" },
+    {
+      name: "cut-on-the-wrong-op",
+      base: 2,
+      entry: entry(
+        e1,
+        { op: "rotate", signer: did(A), epoch: epoch(1, [A, B, R1]), cut: { [did(B)]: oneObject } },
+        [A],
+      ),
+      error: "roster-op",
+    },
+    {
+      name: "cut-for-a-device-not-removed",
+      base: 3,
+      entry: entry(
+        e2,
+        {
+          op: "remove",
+          signer: did(A),
+          remove: [did(B)],
+          cut: { [did(A)]: oneObject },
+          epoch: epoch(1, [A, R1]),
+        },
+        [A],
+      ),
+      error: "roster-op",
+    },
+    {
+      name: "cut-empty",
+      base: 3,
+      entry: entry(
+        e2,
+        { op: "remove", signer: did(A), remove: [did(B)], cut: {}, epoch: epoch(1, [A, R1]) },
+        [A],
+      ),
+      error: "roster-format",
+    },
+    {
+      name: "cut-at-seq-zero",
+      base: 3,
+      entry: entry(
+        e2,
+        {
+          op: "remove",
+          signer: did(A),
+          remove: [did(B)],
+          cut: { [did(B)]: { ...oneObject, seq: 0 } },
+          epoch: epoch(1, [A, R1]),
+        },
+        [A],
+      ),
+      error: "roster-format",
+    },
     { name: "wrong-seq", base: 1, entry: wrongSeq, error: "roster-chain" },
     { name: "truncated-chain", base: 2, entry: e3, error: "roster-chain" },
     {

@@ -26,6 +26,14 @@ const subjectSchema = z.strictObject({
   role: z.enum(["device", "recovery"]),
 });
 
+const cutSchema = z.strictObject({
+  seq: z
+    .int()
+    .min(1)
+    .max(2 ** 53 - 1),
+  hash: hex(32),
+});
+
 const entrySchema = z.strictObject({
   v: z.literal(2),
   group: hex(16),
@@ -35,6 +43,10 @@ const entrySchema = z.strictObject({
   signer: did,
   add: z.array(subjectSchema).min(1).optional(),
   remove: z.array(did).min(1).optional(),
+  cut: z
+    .record(did, cutSchema)
+    .refine((cut) => Object.keys(cut).length > 0)
+    .optional(),
   epoch: z.strictObject({ n: z.int().min(0), kc: b64(32), to: z.array(did).min(1) }).optional(),
   meta: z.record(did, z.string().min(1)).optional(),
   sigs: z.record(did, b64(64)),
@@ -44,12 +56,25 @@ export type Subject = z.infer<typeof subjectSchema>;
 export type Entry = z.infer<typeof entrySchema>;
 export type Op = Entry["op"];
 export type UnsignedEntry = Omit<Entry, "sigs">;
+export type Cut = z.infer<typeof cutSchema>;
 
 export interface Member {
   sig: Uint8Array;
   kem: Uint8Array;
   role: Subject["role"];
   used: boolean;
+}
+
+/** A member of any time: what step 2 of reading an envelope checks a sender against. */
+export interface Sender {
+  sig: Uint8Array;
+  role: Subject["role"];
+  /** The epoch in force when it was added. */
+  since: number;
+  /** The last epoch it could write under, once it was removed or left. */
+  until?: number;
+  /** The last object of its log the removal accepts. Absent when it accepts none. */
+  cut?: Cut;
 }
 
 export interface RosterState {
@@ -61,7 +86,7 @@ export interface RosterState {
   /** A device left during this epoch, so the next device to write must append a rotate first. */
   rotate: boolean;
   members: ReadonlyMap<string, Member>;
-  seen: ReadonlySet<string>;
+  senders: ReadonlyMap<string, Sender>;
 }
 
 export function parseEntry(value: unknown): Entry {
@@ -109,6 +134,10 @@ function checkShape(entry: Entry): void {
   if (rule.add === "none" ? added !== 0 : added !== rule.add) fail("roster-op");
   if (rule.remove !== (entry.remove !== undefined)) fail("roster-op");
   if (rule.epoch !== (entry.epoch !== undefined)) fail("roster-op");
+  if (entry.cut) {
+    if (entry.op !== "remove" && entry.op !== "leave") fail("roster-op");
+    if (!Object.keys(entry.cut).every((id) => entry.remove?.includes(id))) fail("roster-op");
+  }
   if (entry.add && !isSorted(entry.add.map((s) => s.did))) fail("roster-format");
   if (entry.remove && !isSorted(entry.remove)) fail("roster-format");
   if (entry.epoch && !isSorted(entry.epoch.to)) fail("roster-format");
@@ -122,11 +151,11 @@ function checkShape(entry: Entry): void {
   if (added > 0 && roles.join() !== expected.join()) fail("roster-op");
 }
 
-function checkSubject(subject: Subject, seen: ReadonlySet<string>): Member {
+function checkSubject(subject: Subject, senders: ReadonlyMap<string, Sender>): Member {
   const sig = fromB64(subject.sig);
   const kem = fromB64(subject.kem);
   if (!isValidSigningKey(sig)) fail("roster-key");
-  if (toHex(memberId(sig, kem)) !== subject.did || seen.has(subject.did)) fail("roster-key");
+  if (toHex(memberId(sig, kem)) !== subject.did || senders.has(subject.did)) fail("roster-key");
   return { sig, kem, role: subject.role, used: false };
 }
 
@@ -179,9 +208,9 @@ export function checkEntry(
   checkShape(entry);
   if (entry.op === "genesis") checkGroupId(entry);
 
-  const seen = new Set(state?.seen);
+  const senders = new Map(state?.senders);
   const added = new Map<string, Member>();
-  for (const subject of entry.add ?? []) added.set(subject.did, checkSubject(subject, seen));
+  for (const subject of entry.add ?? []) added.set(subject.did, checkSubject(subject, senders));
 
   const signer = checkSigner(entry, state, added);
   const signers = [...new Set([entry.signer, ...added.keys()])];
@@ -201,14 +230,21 @@ export function checkEntry(
       fail("roster-op");
     }
     members.delete(id);
+    const cut = entry.cut?.[id];
+    senders.set(id, {
+      ...(senders.get(id) as Sender),
+      until: state?.epoch as number,
+      ...(cut && { cut }),
+    });
   }
   if (entry.op === "leave" && ![...members.values()].some((m) => m.role === "device")) {
     fail("roster-op");
   }
   if (entry.op === "restore") members.set(entry.signer, { ...signer, used: true });
+  const epoch = entry.epoch ? entry.epoch.n : (state?.epoch ?? 0);
   for (const [id, member] of added) {
     members.set(id, member);
-    seen.add(id);
+    senders.set(id, { sig: member.sig, role: member.role, since: epoch });
   }
 
   if (entry.meta) {
@@ -224,7 +260,6 @@ export function checkEntry(
     fail("roster-meta");
   }
 
-  const epoch = entry.epoch ? entry.epoch.n : (state?.epoch ?? 0);
   if (entry.epoch) {
     if (entry.epoch.n !== (state ? state.epoch + 1 : 0)) fail("roster-epoch");
     if (!sameSet(entry.epoch.to, members.keys())) fail("roster-epoch");
@@ -239,10 +274,29 @@ export function checkEntry(
       kc: entry.epoch?.kc ?? (state?.kc as string),
       rotate: entry.op === "leave" || (!entry.epoch && (state?.rotate ?? false)),
       members,
-      seen,
+      senders,
     },
     signatures,
   };
+}
+
+/**
+ * Step 2 of reading an envelope: a device, within the epochs it belonged to, and no further along
+ * its log than its removal accepted. The caller then checks a removed sender's chain with
+ * `cutChain`.
+ */
+export function checkSender(
+  state: Pick<RosterState, "senders">,
+  did: string,
+  epoch: number,
+  seq: number,
+): Sender {
+  const sender = state.senders.get(did);
+  if (sender?.role !== "device" || epoch < sender.since) fail("sender");
+  if (sender.until !== undefined) {
+    if (epoch > sender.until || seq > (sender.cut?.seq ?? 0)) fail("sender");
+  }
+  return sender;
 }
 
 export function replayRoster(entries: Entry[]): RosterState {

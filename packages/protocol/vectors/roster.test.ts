@@ -26,6 +26,15 @@ function view(state: RosterState) {
     members: [...state.members.entries()]
       .sort(([a], [b]) => (a < b ? -1 : 1))
       .map(([did, m]) => ({ did, role: m.role, used: m.used })),
+    senders: [...state.senders.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([did, s]) => ({
+        did,
+        role: s.role,
+        since: s.since,
+        ...(s.until !== undefined && { until: s.until }),
+        ...(s.cut && { cut: s.cut }),
+      })),
   };
 }
 

@@ -58,12 +58,16 @@ The smallest valid envelope is 482 bytes: a 256-byte payload inside a box.
 A reader MUST, in this order:
 
 1. Check the length (482 bytes to 4 MiB), the magic, a supported suite, the group id, and that `seq` is at most 2<sup>53</sup> − 1, the largest integer every implementation reads exactly.
-2. Find the sender in the roster as a member while `epoch` was in force. Objects written before a device's removal stay valid.
+2. Find the sender in the roster. It must have role `device`, and `epoch` must lie from the epoch in force when it was added up to the last epoch before its removal, or the epoch in force at its `leave`. A removed sender is read only up to its `cut`, along the chain that reaches the hash named there (see below). With no `cut`, nothing more of its log is read.
 3. Verify the signature with the sender's key. Signatures are checked before anything is decrypted.
 4. Check `seq` and `prev` against the sender's stream ([protocol.md](protocol.md#streams)), or the live counter for live messages.
 5. Open the box with `P_e,x` for the type, and decode the payload. When the box doesn't open under the chain's key for `e`, try the key of each other held entry that starts `e` and stands ([protocol.md](protocol.md#forks)), unwrapped from the reader's own wrap at that entry's path. A device may have sealed under an entry that later lost by rank or hash. The key of an entry that fell is never used.
 
 A failure at any step discards the object. It is never partly applied.
+
+**A removed sender's chain.** Checking the `cut`'s hash on arrival would be too late, because the objects below it would already be applied. So when a removed sender's `cut` is above the reader's position, the reader first walks down: it fetches the object at the `cut`'s `seq`, checks that its SHA-256 is the hash the `cut` names, and follows `prev` the same way down to its own position, where the last `prev` must match the hash it last verified. It keeps only the hashes. Then it reads forward as usual, and each object must also have the hash found on the way down. If the walk fails, that sender stops, and only that sender. The chain is fixed by the signed `cut`, so a store can't make the walk longer than the real log.
+
+A store or a LAN peer can't hand a device an object of a removed sender above its `cut`: the device refuses it before holding it.
 
 ### Store logins
 
