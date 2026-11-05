@@ -53,7 +53,7 @@ A device keeps the roster state: the last `seq` and hash, the current epoch `n` 
 5. When `epoch` is present, `n` is the current epoch + 1 (0 for genesis), and `to` is exactly the set of members after the entry.
 6. `meta` keys are members after the entry.
 
-A device can use epoch `e` only after unwrapping `K_e` from its own wrap and checking it against `kc`. A recovery member that has signed a `restore` can never sign again. The restored device MUST replace it with a `recovery` entry right away, which shows the user new words.
+A device can use epoch `e` only after unwrapping `K_e` from its own wrap and checking it against `kc`. It unwraps first and applies the entry only if that works. Otherwise it stays on the chain it had, stops writing, and retries. A device whose LAN session can't open on the settled chain for this reason opens it on the chain it had, to pull what's missing. A recovery member that has signed a `restore` can never sign again. The restored device MUST replace it with a `recovery` entry right away, which shows the user new words.
 
 ### Forks
 
@@ -68,7 +68,7 @@ Only entries valid against the chain from genesis to their own `prev` count. A r
 3. If nothing is contested, the chain is picked from genesis, one `seq` at a time, among the standing children of the entry picked before. Lowest rank wins: `remove` 0, `leave` 1, `recovery` 2, `restore` 3, `rotate` 4, `add` 5, `rename` 6, `genesis` 7. Removal wins so a revoked device can't win with a concurrent entry. `leave` comes next, so an entry that starts an epoch at the same `seq` is re-applied on top of it and leaves the departed device out. `rotate` comes after the other entries that start an epoch, because any of them makes it unnecessary.
 4. For equal rank, the lowest entry hash (as bytes) wins.
 
-Losing entries, and everything built on them, are ignored. A device whose entry lost re-applies its change on top of the winner. A device that holds a verified genesis never replaces it, whatever else it holds.
+Losing entries, and everything built on them, are ignored, except that the key of a losing entry that stands can still open what was sealed under it ([store.md](store.md#reading-an-envelope)). A device whose entry lost re-applies its change on top of the winner. A device that holds a verified genesis never replaces it, whatever else it holds.
 
 #### Contested rosters
 

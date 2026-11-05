@@ -9,10 +9,12 @@ export interface ForkResolution {
   contested: Entry[];
   /** The contested entries that revoke another contested entry: what the user chooses between. */
   sides: Entry[];
+  /** The entries off the chain that stand and start an epoch: their keys still open objects. */
+  standing: Entry[];
 }
 
 export type RosterSettlement =
-  | { outcome: "apply"; chain: Entry[]; extendsApplied: boolean }
+  | { outcome: "apply"; chain: Entry[]; standing: Entry[]; extendsApplied: boolean }
   | { outcome: "contested"; contested: Entry[]; sides: Entry[] }
   | { outcome: "rollback" }
   | { outcome: "rewritten" };
@@ -149,6 +151,7 @@ export function resolveForks(
       chain: [],
       contested: open.map((node) => node.entry),
       sides: sides.map((node) => node.entry),
+      standing: [],
     };
   }
 
@@ -160,7 +163,10 @@ export function resolveForks(
     const node = candidates.find((candidate) => candidate.entry === winner) as Node;
     candidates = node.children.filter((child) => child.status === "stands");
   }
-  return { chain, contested: [], sides: [] };
+  const standing = nodes
+    .filter((node) => node.status === "stands" && node.entry.epoch && !chain.includes(node.entry))
+    .map((node) => node.entry);
+  return { chain, contested: [], sides: [], standing };
 }
 
 /**
@@ -179,7 +185,8 @@ export function settleRoster(input: {
   if (applied.some((entry) => !seen.has(hashOf(entry)))) return { outcome: "rollback" };
 
   const first = applied[0];
-  const { chain, contested, sides } = resolveForks(group, view, pins, first && hashOf(first));
+  const resolved = resolveForks(group, view, pins, first && hashOf(first));
+  const { chain, contested, sides, standing } = resolved;
   if (contested.length > 0) return { outcome: "contested", contested, sides };
   if (chain.length === 0) fail("roster-chain");
 
@@ -187,5 +194,5 @@ export function settleRoster(input: {
     applied.length <= chain.length &&
     applied.every((entry, i) => hashOf(entry) === hashOf(chain[i] as Entry));
   if (!extendsApplied && linear) return { outcome: "rewritten" };
-  return { outcome: "apply", chain, extendsApplied };
+  return { outcome: "apply", chain, standing, extendsApplied };
 }

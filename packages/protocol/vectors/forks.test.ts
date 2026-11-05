@@ -23,6 +23,7 @@ function view(settled: RosterSettlement) {
     return {
       outcome: settled.outcome,
       chain: settled.chain.map((e) => hashes.get(toHex(entryHash(e)))),
+      standing: names(settled.standing),
       extendsApplied: settled.extendsApplied,
     };
   }

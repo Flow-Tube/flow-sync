@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   agreementPublicKey,
+  chainPath,
   checkEpochKey,
   decodePayload,
   epochCommitment,
@@ -22,6 +23,7 @@ import {
   unwrapEpochKey,
   utf8,
   wrapEpochKey,
+  wrapPath,
 } from "../src/index.ts";
 import { bytes, expectCode, load } from "./load.ts";
 
@@ -43,6 +45,11 @@ describe("keys", () => {
     for (const [purpose, value] of Object.entries(purposes)) {
       expect(toHex(purposeKey(bytes(key), bytes(group), epoch, purpose as "roster"))).toBe(value);
     }
+  });
+  test("wrap and chain paths", () => {
+    const { epoch, commitment, did, wrap, chain } = v.paths;
+    expect(wrapPath(epoch, bytes(commitment), did)).toBe(wrap);
+    expect(chainPath(epoch, bytes(commitment))).toBe(chain);
   });
   test("wrap and unwrap", async () => {
     const w = v.wrap;

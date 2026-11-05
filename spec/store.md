@@ -9,15 +9,15 @@ Paths are relative to a configurable root. Names use only lowercase `[0-9a-f._/-
 ```
 store.json                                     {"format":"FLOW-SYNC/2","group":"<hex>"}
 roster/<seq:16>-<hash:16>.r                    roster entry, canonical JSON
-keys/<epoch:8>/<did:32>.k                      HPKE wrap of K_e for one member, 80 bytes
-keys/<epoch:8>/chain.k                         history chain box (epoch > 0)
+keys/<epoch:8>/<kc:16>/<did:32>.k              HPKE wrap of K_e for one member, 80 bytes
+keys/<epoch:8>/<kc:16>/chain.k                 history chain box (epoch > 0)
 dev/<did:32>/log/<shard:16>/<seq:16>.o         log object (envelope), shard = seq >> 10
 dev/<did:32>/blob/<sha256:64>.b                snapshot blob
 pair/<slot:32>/<dir>-<seq:16>.p                pairing mailbox message, dir is a or b
 probe/<random:32>                              setup probe, deleted right after
 ```
 
-`<x:n>` is `x` in lowercase hex, zero-padded to `n` digits. `<hash:16>` is the first 8 bytes of the entry hash; `<slot:32>` is `Hash("pair", t)[0..16]`.
+`<x:n>` is `x` in lowercase hex, zero-padded to `n` digits. `<hash:16>` is the first 8 bytes of the entry hash; `<kc:16>` is the first 8 bytes of the epoch's `kc`, so entries that start the same epoch number on two sides of a fork keep their keys apart; `<slot:32>` is `Hash("pair", t)[0..16]`.
 
 ### Writing rules
 
@@ -60,7 +60,7 @@ A reader MUST, in this order:
 2. Find the sender in the roster as a member while `epoch` was in force. Objects written before a device's removal stay valid.
 3. Verify the signature with the sender's key. Signatures are checked before anything is decrypted.
 4. Check `seq` and `prev` against the sender's stream ([protocol.md](protocol.md#streams)), or the live counter for live messages.
-5. Open the box with `P_e,x` for the type, and decode the payload.
+5. Open the box with `P_e,x` for the type, and decode the payload. When the box doesn't open under the chain's key for `e`, try the key of each other held entry that starts `e` and stands ([protocol.md](protocol.md#forks)), unwrapped from the reader's own wrap at that entry's path. A device may have sealed under an entry that later lost by rank or hash. The key of an entry that fell is never used.
 
 A failure at any step discards the object. It is never partly applied.
 
@@ -80,7 +80,7 @@ blob = Box(P_e,snapshot, "FLOW-SYNC/2 blob" ‖ group ‖ u32(e) ‖ did, payloa
 name = hex(SHA-256(blob))
 ```
 
-`e` and `did` are the epoch and sender of the manifest that lists the blob. The blob isn't signed: the signed manifest names its hash, so the reader checks the hash first. Blob content uses the change batch format: a header line, then records.
+`e` and `did` are the epoch and sender of the manifest that lists the blob. The blob isn't signed: the signed manifest names its hash, so the reader checks the hash first. It then opens the blob the way step 5 opens the manifest. Blob content uses the change batch format: a header line, then records.
 
 ## Pairing mailbox
 
@@ -90,7 +90,7 @@ When pairing through a store, the member opens a slot and each side writes its m
 
 ### Flow server
 
-The server stores this layout behind its API, indexes objects by sender and `seq`, and offers one cursor over all new objects. It linearizes roster appends, so honest roster forks can't happen there, and a device treats a changed history as misbehaviour ([protocol.md](protocol.md#what-a-device-does-with-a-stores-answer)).
+The server stores this layout behind its API, indexes objects by sender and `seq`, and offers one cursor over all new objects. It linearizes roster appends, so honest roster forks can't happen there, and a device treats a changed history as misbehaviour ([protocol.md](protocol.md#what-a-device-does-with-a-stores-answer)). Only one entry can start an epoch there, so its [API](api.md) names a wrap by epoch alone, without `<kc:16>`. A device checks that wrap against the full `kc` as on any other store.
 
 ### S3-compatible
 
