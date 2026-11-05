@@ -81,7 +81,7 @@ K_sc = Derive(P_e,lan, n_C ‖ n_S, "lan s2c", C ‖ S, 32)
 
 Later frames are `u64(seq) ‖ Box(K, "FLOW-SYNC/2 lan" ‖ u64(seq), payload)`, with `seq` counting from 0 in each direction and checked strictly.
 
-S answers a hello under any epoch it holds a key for, up to its own. C sends its first hello under its current epoch. When S closes the connection without answering message 2, C dials again one epoch lower, for at most 4 attempts in all. So members on two sides of a fork still meet: below the fork they hold the same key. They pull what the other holds, settle, and the next session runs at the epoch they share. C doesn't retry when it can't connect at all, or when message 2 fails a check.
+S answers a hello under any epoch it holds a key for, up to its own. C sends its first hello under its current epoch. When S closes the connection without answering message 2, C dials again one epoch lower, for at most 4 attempts in all. So members on two sides of a fork still meet: below the fork they hold the same key. They pull what the other holds, settle, and the next session runs at the epoch they share. C doesn't retry when it can't connect at all, or when message 2 fails a check. While they are on two sides of a fork their [discovery tags](#discovery) differ, so they meet through remembered addresses. A session at an older epoch is under that epoch's `P_e,lan`; the objects and live messages it carries keep their own sealing.
 
 ### Requests
 
