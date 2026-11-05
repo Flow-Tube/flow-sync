@@ -48,6 +48,7 @@ Log objects (change batches, snapshot manifests, acks) and live messages share o
 | `0x01` | Change batch | `changes` |
 | `0x02` | Snapshot manifest | `snapshot` |
 | `0x03` | Acknowledgement | `ack` |
+| `0x04` | Store login | `store` |
 | `0x10` | Live message | `live` |
 
 The smallest valid envelope is 482 bytes: a 256-byte payload inside a box.
@@ -63,6 +64,12 @@ A reader MUST, in this order:
 5. Open the box with `P_e,x` for the type, and decode the payload. When the box doesn't open under the chain's key for `e`, try the key of each other held entry that starts `e` and stands ([protocol.md](protocol.md#forks)), unwrapped from the reader's own wrap at that entry's path. A device may have sealed under an entry that later lost by rank or hash. The key of an entry that fell is never used.
 
 A failure at any step discards the object. It is never partly applied.
+
+### Store logins
+
+A store login object carries canonical JSON with the fields [`welcome`](protocol.md#messages) gives for that store, without its address: `{"k":"webdav","n":"<user>","w":"<password>"}` or `{"k":"s3","a":"<access key id>","s":"<secret>"}`. So it can't point a device at another store.
+
+A reader takes the login only when the object opens under the chain's key of the epoch in force, and its sender is a current device. The rule for older epochs in step 2 and the other keys in step 5 don't apply. Otherwise, and on a Flow server or a LAN group, it ignores the login, and the object still counts as read. See [Replacing a store's login](protocol.md#replacing-a-stores-login).
 
 ### Untrusted input
 
