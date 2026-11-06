@@ -125,7 +125,7 @@ Both sides then derive `K_ab`, `K_ba` and the SAS. Every later message is a box,
 
 **A shower reveals its key at most once per code,** whichever way the scanner arrives, and serves no other scanner after that. If pairing then fails or is cancelled, the code is finished and pairing again needs a new one. This is what limits anyone in the middle to one guess at the digits, so it's not optional. A code's keys live only in memory.
 
-- **LAN:** the scanner tries the `l` addresses in order, each with a 3-second connect timeout, and opens a WebSocket to `ws://<a>:<p>/flow-sync/2/pair`. The first binary frame in each direction is the message above; every later frame is one box. The shower serves one connection at a time. Until it has revealed, it drops a connection whose first frame has a wrong `proof` or doesn't arrive within 5 seconds, and serves the next.
+- **LAN:** the scanner tries the `l` addresses in order, each with a 3-second connect timeout, and opens a WebSocket to `ws://<a>:<p>/flow-sync/2/pair`. The first binary frame in each direction is the message above; every later frame is one box. Until it has revealed, the shower waits on up to 8 connections at once, and drops one whose first frame has a wrong `proof` or doesn't arrive within 5 seconds. The first good one takes the reveal, and it drops the rest.
 - **Mailbox:** the messages above are the first file in each direction, and boxes follow from the second file. A wrong `proof` ends the mailbox path for that code; the LAN path, if any, stays open.
 
 The shower keeps the slot open for 180 seconds and then closes it, as in FLOW-SYNC/1. Neither side compares clocks.
