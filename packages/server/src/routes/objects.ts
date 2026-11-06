@@ -1,5 +1,6 @@
 import {
   BOX_OVERHEAD,
+  checkSender,
   type DevicePath,
   fromHex,
   logPath,
@@ -70,6 +71,7 @@ async function checkObject(
   if (!valid) throw new HttpError("invalid");
   const sender = state.members.get(target.did);
   if (!sender) throw new HttpError("forbidden");
+  checkSender(state, target.did, header.epoch, header.seq);
   if (!(await verifySignature(objectSignature(object, sender.sig)))) throw new HttpError("invalid");
   // Sealed before the sender saw the new epoch (spec/api.md, Objects); a device never goes back.
   if (header.epoch < state.epoch && header.epoch < (await previousEpoch(stores, state, target))) {

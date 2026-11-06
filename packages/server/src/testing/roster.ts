@@ -80,5 +80,5 @@ export async function rotation(h: Harness, token: string) {
   const entry = buildEntry(h.group, state, rotateDraft(h.device, key, h.group, 1, remaining), [
     h.device,
   ]);
-  return { entry, wraps, chain, head: state.head };
+  return { entry, wraps, chain, head: state.head, key };
 }

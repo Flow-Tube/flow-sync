@@ -6,7 +6,7 @@ import { epochCommitment, purposeKey } from "./epoch.ts";
 import { tag } from "./kdf.ts";
 import type { MemberKeys, MemberSecrets } from "./keys.ts";
 import { decodePayload, encodePayload } from "./payload.ts";
-import { type Entry, type Subject, signEntry } from "./roster.ts";
+import { type Cut, type Entry, type Subject, signEntry } from "./roster.ts";
 
 export type EntryDraft = Omit<Entry, "v" | "group" | "seq" | "prev" | "sigs">;
 
@@ -38,9 +38,10 @@ export function epochDraft(
   };
 }
 
-export function leaveDraft(leaving: MemberKeys): EntryDraft {
+/** `last` is the device's own last log object; a device that wrote nothing has none. */
+export function leaveDraft(leaving: MemberKeys, last?: Cut): EntryDraft {
   const did = toHex(leaving.did);
-  return { op: "leave", signer: did, remove: [did] };
+  return { op: "leave", signer: did, remove: [did], ...(last && { cut: { [did]: last } }) };
 }
 
 /** Starts epoch `n` for exactly the current `members`. */

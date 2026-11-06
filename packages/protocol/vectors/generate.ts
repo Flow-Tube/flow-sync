@@ -12,6 +12,7 @@ import {
   payloadVectors,
 } from "./primitives.ts";
 import { rosterVectors } from "./roster.ts";
+import { senderVectors } from "./senders.ts";
 
 export const VECTORS_DIR = new URL("../../../spec/vectors/", import.meta.url);
 
@@ -27,6 +28,7 @@ export async function buildVectors(): Promise<Record<string, Vectors>> {
     envelope: envelopeVectors(),
     roster: rosterVectors(),
     forks: forkVectors(),
+    senders: senderVectors(),
     pairing: pairingVectors(),
     lan: lanVectors(),
   };

@@ -23,9 +23,24 @@ function view(state: RosterState) {
     head: state.head,
     epoch: state.epoch,
     rotate: state.rotate,
+    recoveryDue: state.recoveryDue,
     members: [...state.members.entries()]
       .sort(([a], [b]) => (a < b ? -1 : 1))
-      .map(([did, m]) => ({ did, role: m.role, used: m.used })),
+      .map(([did, m]) => ({
+        did,
+        role: m.role,
+        used: m.used,
+        ...(m.installer && { installer: m.installer }),
+      })),
+    senders: [...state.senders.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([did, s]) => ({
+        did,
+        role: s.role,
+        since: s.since,
+        ...(s.until !== undefined && { until: s.until }),
+        ...(s.cut && { cut: s.cut }),
+      })),
   };
 }
 
@@ -43,6 +58,14 @@ describe("roster", () => {
   for (const n of v.geneses)
     test(n.name, async () => {
       await expectCode(() => applyEntry(undefined, parseEntry(n.entry)), n.error);
+    });
+  for (const r of v.replacements)
+    test(r.name, async () => {
+      const steps: Entry[] = r.steps.map(parseEntry);
+      const last = steps.pop() as Entry;
+      const base = steps.reduce(applyEntry, stateAfter(r.base ?? entries.length));
+      if (r.error) await expectCode(() => applyEntry(base, last), r.error);
+      else expect(view(applyEntry(base, last))).toEqual(r.state);
     });
   test("device names open with the roster key of their epoch", () => {
     for (const m of v.meta) {

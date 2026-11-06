@@ -19,6 +19,7 @@ import { device, group, hex, rand, recovery, type Vectors } from "./fixtures.ts"
 const { A, B, C } = device;
 const [R1, R2] = recovery as [MemberSecrets, MemberSecrets];
 const N = memberSecrets(rand("N sig"), rand("N kem"));
+const R3 = memberSecrets(rand("R3 sig"), rand("R3 kem"));
 const X = memberSecrets(rand("X sig"), rand("X kem"));
 const Y = memberSecrets(rand("Y sig"), rand("Y kem"));
 const did = (m: MemberKeys) => hex(m.did);
@@ -134,6 +135,39 @@ function entries() {
     [N, R2],
   );
 
+  const cSetsWords = next(
+    addC,
+    {
+      op: "recovery",
+      signer: did(C),
+      remove: [did(R1)],
+      add: [memberSubject(R2, "recovery")],
+      epoch: epochDraft(key("c sets words"), group, 1, [A, B, C, R2]),
+    },
+    [C, R2],
+  );
+  const restoreWithThem = next(
+    cSetsWords,
+    {
+      op: "restore",
+      signer: did(R2),
+      add: [memberSubject(N, "device")],
+      epoch: epochDraft(key("restore with them"), group, 2, [A, B, C, N, R2]),
+    },
+    [R2, N],
+  );
+  const aRemovesCReplacing = next(
+    cSetsWords,
+    {
+      op: "remove",
+      signer: did(A),
+      remove: [did(C), did(R2)].sort(),
+      add: [memberSubject(R3, "recovery")],
+      epoch: epochDraft(key("a replaces"), group, 2, [A, B, R3]),
+    },
+    [A, R3],
+  );
+
   const aRotate = next(addC, rotateDraft(A, key("a rotate"), group, 1, [A, B, C, R1]), [A]);
   const bRotate = next(addC, rotateDraft(B, key("b rotate"), group, 1, [A, B, C, R1]), [B]);
   const cAdds = next(addC, { op: "add", signer: did(C), add: [memberSubject(N, "device")] }, [
@@ -185,6 +219,9 @@ function entries() {
     cPad2,
     aRemovesCOnRotate,
     replaceWords,
+    cSetsWords,
+    restoreWithThem,
+    aRemovesCReplacing,
     restoreEarly,
     restorePad1,
     restorePad2,
@@ -250,6 +287,10 @@ const CASES: Case[] = [
     view: [...BASE, "restoreEarly", "restorePad1", "restorePad2", "restorePad3"],
   },
   { name: "restore-then-replace", view: [...BASE, "restore", "restored"] },
+  {
+    name: "restore-against-the-removal-that-replaces-its-key",
+    view: [...BASE, "cSetsWords", "restoreWithThem", "aRemovesCReplacing"],
+  },
   { name: "entry-below-its-signers-removal", view: [...BASE, "cRotate", "aRemovesCOnRotate"] },
   { name: "concurrent-rotates", view: [...BASE, "aRotate", "bRotate"] },
   { name: "add-against-removing-its-signer", view: [...BASE, "cAdds", "aRemovesC"] },
