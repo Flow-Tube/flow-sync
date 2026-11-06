@@ -95,7 +95,7 @@ name = hex(SHA-256(blob))
 
 ## Pairing mailbox
 
-When pairing through a store, the member opens a slot and each side writes its messages ([protocol.md](protocol.md#pairing)) to `pair/<slot>/<dir>-<seq>.p` (`a` from the code's shower, `b` from the scanner). Each file is one box. The member deletes the slot when pairing ends or its 180 seconds run out. On the Flow server the mailbox is an API ([api.md](api.md)) with the same messages.
+When pairing through a store, the member opens a slot and each side writes its messages ([protocol.md](protocol.md#pairing)) to `pair/<slot>/<dir>-<seq>.p` (`a` from the code's shower, `b` from the scanner). The first file in each direction is the clear message that starts the [channel](protocol.md#channel), and each later file is one box. The member deletes the slot when pairing ends or its 180 seconds run out. On the Flow server the mailbox is an API ([api.md](api.md)) with the same messages.
 
 ## Backends
 

@@ -171,13 +171,15 @@ Compressing before encrypting leaks information only when an attacker can put ch
 Pairing uses an ephemeral X25519 key per side and the QR code's 16-byte token `t` ([protocol.md](protocol.md)). With `A` the device showing the code and `B` the scanner:
 
 ```
+c      = Hash("pair commit", e_A_pub)                       in the code, instead of e_A_pub
+proof  = Derive(t, "", "pair proof", e_B_pub, 16)           with the scanner's key
 z      = X25519(e_A, e_B)                                   reject all zeros
 K_ab   = Derive(z, t, "pair a2b", e_A_pub ‖ e_B_pub, 32)
 K_ba   = Derive(z, t, "pair b2a", e_A_pub ‖ e_B_pub, 32)
 SAS    = Derive(z, t, "sas", e_A_pub ‖ e_B_pub, 4)  as a big-endian integer, top bit cleared, mod 1 000 000
 ```
 
-The SAS is shown as six digits with leading zeros. Messages from A to B are boxes under `K_ab` and from B to A under `K_ba`, with `aad = "FLOW-SYNC/2 pair" ‖ t ‖ u64(seq)`. Because both keys depend on `t`, only someone who read the QR code can produce a box the other side accepts.
+The SAS is shown as six digits with leading zeros. `proof` is compared in constant time. The commitment stops either side from choosing its key after seeing the other's, which is what makes the digits a real check: see [Channel](protocol.md#channel). Messages from A to B are boxes under `K_ab` and from B to A under `K_ba`, with `aad = "FLOW-SYNC/2 pair" ‖ t ‖ u64(seq)`. Because both keys depend on `t`, only someone who read the QR code can produce a box the other side accepts. In the [admin-token join](protocol.md#joining-with-the-admin-token) the server reads the code too, so there only the digits decide.
 
 ## Recovery key
 

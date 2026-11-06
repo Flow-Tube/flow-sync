@@ -1,4 +1,3 @@
-import { BOX_OVERHEAD } from "@flow-sync/protocol";
 import { type Context, Hono } from "hono";
 import { z } from "zod";
 import { type AuthDeps, requireMember } from "../auth/device.ts";
@@ -42,7 +41,7 @@ export function pairRoutes(deps: AuthDeps) {
       if (Number.parseInt(name.slice(2, 18), 16) >= LIMITS.pairMessages)
         throw new HttpError("invalid");
       const bytes = await readBytes(c);
-      if (bytes.length < BOX_OVERHEAD) throw new HttpError("invalid");
+      if (bytes.length < LIMITS.pairMessageMin) throw new HttpError("invalid");
       const result = await meta.putPairMessage(slot, name, bytes);
       if (result === "conflict") throw new HttpError("conflict");
       return c.body(null, result === "created" ? 201 : 200);
