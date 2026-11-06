@@ -18,6 +18,8 @@ export const LIMITS = {
   challengeMs: 60 * 1000,
   tokenMs: 15 * 60 * 1000,
   pairMs: 180 * 1000,
+  /** The shower's bare key, the shortest message on the channel. */
+  pairMessageMin: 32,
   pairMessage: 8 * KiB,
   pairMessages: 8,
   pairSlots: 3,

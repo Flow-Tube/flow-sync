@@ -12,7 +12,9 @@ import {
   memberSubject,
   open,
   pairingAad,
+  pairingCommit,
   pairingKeys,
+  pairingProof,
   pairingSlot,
   pairPath,
   randomBytes,
@@ -37,8 +39,10 @@ interface Keys {
 function mailbox(device: SimDevice, slot: string, token: Uint8Array, me: "a" | "b") {
   const other = me === "a" ? "b" : "a";
   let keys: Keys | undefined;
-  let sent = 0;
-  let received = 0;
+  let sentFiles = 0;
+  let receivedFiles = 0;
+  let sentBoxes = 0;
+  let receivedBoxes = 0;
   const need = () => {
     if (!keys) throw new Error("pairing keys not derived yet");
     return keys;
@@ -47,31 +51,26 @@ function mailbox(device: SimDevice, slot: string, token: Uint8Array, me: "a" | "
     useKeys(derived: Keys) {
       keys = derived;
     },
-    async send(message: Message, prefix: Uint8Array = new Uint8Array()) {
-      const seq = sent++;
-      const sealed = seal(
-        need().send,
-        pairingAad(token, seq),
-        encodePayload(utf8(canonical(message))),
-      );
-      const res = await device.fetch(`/v1/${pairPath(slot, me, seq)}`, {
+    async put(bytes: Uint8Array) {
+      const res = await device.fetch(`/v1/${pairPath(slot, me, sentFiles++)}`, {
         method: "PUT",
         headers: { "content-type": "application/octet-stream" },
-        body: concat(prefix, sealed),
+        body: bytes,
       });
       if (res.status !== 201) throw new Error(`mailbox put ${res.status}`);
     },
-    async next(): Promise<Uint8Array> {
-      const res = await device.fetch(`/v1/${pairPath(slot, other, received)}`);
+    async get(): Promise<Uint8Array> {
+      const res = await device.fetch(`/v1/${pairPath(slot, other, receivedFiles++)}`);
       if (!res.ok) throw new Error(`mailbox get ${res.status}`);
       return new Uint8Array(await res.arrayBuffer());
     },
-    open(sealed: Uint8Array): Message {
-      const payload = open(need().receive, pairingAad(token, received++), sealed);
-      return JSON.parse(new TextDecoder().decode(decodePayload(payload)));
+    async send(message: Message) {
+      const aad = pairingAad(token, sentBoxes++);
+      await this.put(seal(need().send, aad, encodePayload(utf8(canonical(message)))));
     },
     async receive(): Promise<Message> {
-      return this.open(await this.next());
+      const payload = open(need().receive, pairingAad(token, receivedBoxes++), await this.get());
+      return JSON.parse(new TextDecoder().decode(decodePayload(payload)));
     },
   };
 }
@@ -84,6 +83,7 @@ export async function pairThroughMailbox(member: SimDevice, joining: SimDevice, 
   const token = randomBytes(16);
   const showerSecret = randomBytes(32);
   const showerPublic = agreementPublicKey(showerSecret);
+  const commit = pairingCommit(showerPublic);
   const slot = toHex(pairingSlot(token));
   await member.json("/v1/pair", { slot });
   const shower = mailbox(member, slot, token, "a");
@@ -91,21 +91,29 @@ export async function pairThroughMailbox(member: SimDevice, joining: SimDevice, 
 
   const scannerSecret = randomBytes(32);
   const scannerPublic = agreementPublicKey(scannerSecret);
-  const b = pairingKeys(scannerSecret, showerPublic, token, showerPublic, scannerPublic);
+  await scanner.put(concat(scannerPublic, pairingProof(token, scannerPublic)));
+
+  const first = await shower.get();
+  const theirPublic = first.subarray(0, 32);
+  if (toHex(first.subarray(32)) !== toHex(pairingProof(token, theirPublic))) {
+    throw new Error("bad proof");
+  }
+  await shower.put(showerPublic);
+  const a = pairingKeys(showerSecret, theirPublic, token, showerPublic, theirPublic);
+  shower.useKeys({ send: a.showerKey, receive: a.scannerKey });
+
+  const revealed = await scanner.get();
+  if (toHex(pairingCommit(revealed)) !== toHex(commit)) throw new Error("key doesn't match code");
+  const b = pairingKeys(scannerSecret, revealed, token, revealed, scannerPublic);
   scanner.useKeys({ send: b.scannerKey, receive: b.showerKey });
-  const join = {
+  await scanner.send({
     type: "join",
     sig: toB64(joining.keys.sigPublic),
     kem: toB64(joining.keys.kemPublic),
     meta: { app: "app", name: "Desktop", platform: "linux" },
-  };
-  await scanner.send(join, scannerPublic);
+  });
 
-  const first = await shower.next();
-  const theirPublic = first.subarray(0, 32);
-  const a = pairingKeys(showerSecret, theirPublic, token, showerPublic, theirPublic);
-  shower.useKeys({ send: a.showerKey, receive: a.scannerKey });
-  const joined = shower.open(first.subarray(32));
+  const joined = await shower.receive();
   const state = await member.syncRoster();
   const kemPublic = fromB64(joined.kem as string);
   const subject = memberSubject(

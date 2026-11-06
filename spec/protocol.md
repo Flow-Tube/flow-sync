@@ -102,10 +102,11 @@ Pairing joins a new device N to the group through a member M. Whichever device h
 Canonical JSON, at most 512 bytes:
 
 ```
-{"v":2,"t":b64(16 random bytes),"e":b64(ephemeral X25519 public key),
+{"v":2,"t":b64(16 random bytes),"c":b64(commitment to the ephemeral X25519 public key),
  "r":"m" or "n", "d":"device name", "s":{store}, "l":[{"a":"192.168.1.20","p":49210}]}
 ```
 
+- `c` is `Hash("pair commit", e_A_pub)` ([crypto.md](crypto.md#pairing)). The key itself comes later, on the channel. A device refuses a code without `c`.
 - `r` is the role of the device showing the code: `m` member, `n` new.
 - `s` is shown only by a member: `{"k":"server","u":"https://…"}`, `{"k":"webdav","u":"https://…/flow-sync/"}`, `{"k":"s3","u":endpoint,"b":bucket,"g":region,"x":prefix}` or `{"k":"lan"}`. It never contains credentials.
 - `l` lists LAN addresses where the shower listens, using the same address rules as FLOW-SYNC/1. A new device always lists them, because it knows no store yet.
@@ -114,12 +115,18 @@ FLOW-SYNC/1 apps reject `v:2` and ask the user to update. FLOW-SYNC/2 apps still
 
 ### Channel
 
-The scanner reaches the shower over the LAN when an `l` address answers. Otherwise, when the shower is a member, it uses the store's pairing mailbox ([store.md](store.md#pairing-mailbox)). On a Flow server the mailbox needs no credentials. On WebDAV and S3 it does, so the scanner uses it only when the user entered that store's credentials before scanning; otherwise both devices must be on the same LAN. Both sides derive `K_ab`, `K_ba` and the SAS ([crypto.md](crypto.md#pairing)). Every message is a box, numbered from 0 in each direction. The scanner's first message starts with its ephemeral X25519 public key (32 bytes), in the clear, followed by the box: the shower needs that key to derive the keys that open it.
+The scanner reaches the shower over the LAN when an `l` address answers. Otherwise, when the shower is a member, it uses the store's pairing mailbox ([store.md](store.md#pairing-mailbox)). On a Flow server the mailbox needs no credentials. On WebDAV and S3 it does, so the scanner uses it only when the user entered that store's credentials before scanning; otherwise both devices must be on the same LAN. Two messages travel in the clear first, so that each side is bound to its key before it sees the other's:
 
-The scanner first sends its ephemeral X25519 public key (32 bytes) in the clear, because the shower needs it to derive the keys:
+1. The scanner sends its ephemeral X25519 public key (32 bytes) followed by `proof` (16 bytes, [crypto.md](crypto.md#pairing)).
+2. The shower checks `proof`. If it's wrong, the shower reveals nothing and the code stays usable. If it's right, the shower sends its ephemeral X25519 public key (32 bytes).
+3. The scanner checks that key against `c` from the code, and stops if it doesn't match.
 
-- **LAN:** the scanner tries the `l` addresses in order, each with a 3-second connect timeout, and opens a WebSocket to `ws://<a>:<p>/flow-sync/2/pair`. Its first binary frame is the key; every later frame, in both directions, is one message. The shower serves one scanner at a time, and drops a connection as soon as a box from it fails to open.
-- **Mailbox:** the key is the prefix of the scanner's first message.
+Both sides then derive `K_ab`, `K_ba` and the SAS. Every later message is a box, numbered from 0 in each direction.
+
+**A shower reveals its key at most once per code,** whichever way the scanner arrives, and serves no other scanner after that. If pairing then fails or is cancelled, the code is finished and pairing again needs a new one. This is what limits anyone in the middle to one guess at the digits, so it's not optional. A code's keys live only in memory.
+
+- **LAN:** the scanner tries the `l` addresses in order, each with a 3-second connect timeout, and opens a WebSocket to `ws://<a>:<p>/flow-sync/2/pair`. The first binary frame in each direction is the message above; every later frame is one box. Until it has revealed, the shower waits on up to 8 connections at once, and drops one whose first frame has a wrong `proof` or doesn't arrive within 5 seconds. The first good one takes the reveal, and it drops the rest.
+- **Mailbox:** the messages above are the first file in each direction, and boxes follow from the second file. A wrong `proof` ends the mailbox path for that code; the LAN path, if any, stays open.
 
 The shower keeps the slot open for 180 seconds and then closes it, as in FLOW-SYNC/1. Neither side compares clocks.
 
@@ -139,6 +146,8 @@ Each message is canonical JSON with a `type`, carried as a payload in a box.
 
 Over the LAN, `join` and `welcome` also carry `p`, the port of the sender's [LAN service](live.md#discovery). Each device remembers the other's address on the pairing connection with that `p`, so they can meet again where mDNS doesn't reach.
 
+A user who says the digits differ is told that nothing was shared, that pairing needs a new code, and that if it happens again someone may be interfering. A scanner whose check against `c` fails says the same.
+
 N pins the head from `welcome`. A store that later shows N a different history at or below that `seq` is treated as a fork.
 
 ### Joining with the admin token
@@ -146,11 +155,11 @@ N pins the head from `welcome`. A store that later shows N a different history a
 On a Flow server, a new device can ask to join instead of scanning a code ([api.md](api.md)):
 
 1. The new device posts a join request with the admin token: a random 16-byte `id` (hex) and its device name, at most 64 characters. A request lasts 180 seconds, and at most 3 are pending.
-2. Linked devices list pending requests while Linked devices is open and on each sync, and ask the user: "*name* wants to join".
+2. Linked devices list pending requests while Linked devices is open and on each sync, and ask the user whether to accept the request, saying that the name isn't verified and to accept only if they started this on the other device.
 3. A member that accepts makes an offer exactly as for a QR code, posts the code to the request, and waits as the shower through the pairing mailbox. A member that declines marks the request declined; it then no longer counts toward the 3 pending.
 4. The new device polls its request with the admin token until the code arrives, then pairs as the scanner of that code. If a member declined, the poll answers `declined` until the request would have expired, and the new device stops and tells the user. A request that expires unanswered reads as unknown.
 
-The six-digit check still decides. The name in a request is unauthenticated, and a server that swaps codes makes the two devices show different digits.
+Here the code passes through the server, which can read or replace it, so the code authenticates nothing and only the six-digit check decides. The commitment and the single reveal limit a server in the middle to one guess at the digits per attempt (1 in 10<sup>6</sup>), and a wrong guess shows the user different digits. A server can also use up an offer, which is no more than refusing service.
 
 ## Removal
 

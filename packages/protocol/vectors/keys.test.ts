@@ -13,7 +13,9 @@ import {
   memberSecrets,
   open,
   openChain,
+  pairingCommit,
   pairingKeys,
+  pairingProof,
   pairingSlot,
   purposeKey,
   recoveryKeys,
@@ -119,6 +121,11 @@ test("pairing", () => {
   ]);
   expect(toHex(agreementPublicKey(bytes(v.showerSecret)))).toBe(v.showerPublic);
   expect(toHex(pairingSlot(token))).toBe(v.slot);
+  expect(toHex(pairingCommit(bytes(v.showerPublic)))).toBe(v.commit);
+  expect(toHex(pairingProof(token, bytes(v.scannerPublic)))).toBe(v.proof);
+  expect(v.scannerFirst).toBe(v.scannerPublic + v.proof);
+  expect(toHex(pairingCommit(bytes(v.refused.showerPublic)))).not.toBe(v.commit);
+  expect(v.refused.proof).not.toBe(v.proof);
   const m = v.message;
   const content = decodePayload(open(shower.scannerKey, bytes(m.aad), bytes(m.box)));
   expect(content).toEqual(utf8(m.content));

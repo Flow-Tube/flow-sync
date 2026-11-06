@@ -40,11 +40,13 @@ describe("pairing mailbox", () => {
     await h.open();
     const last = `a-${LIMITS.pairMessages.toString(16).padStart(16, "0")}.p`;
     expect((await h.app.request(h.url(last), put(randomBytes(200)))).status).toBe(400);
-    expect((await h.app.request(h.url("a-0000000000000000.p"), put(randomBytes(10)))).status).toBe(
-      400,
-    );
+    const first = h.url("a-0000000000000000.p");
+    const short = put(randomBytes(LIMITS.pairMessageMin - 1));
+    expect((await h.app.request(first, short)).status).toBe(400);
+    const shortest = put(randomBytes(LIMITS.pairMessageMin));
+    expect((await h.app.request(first, shortest)).status).toBe(201);
     const big = randomBytes(LIMITS.pairMessage + 1);
-    expect((await h.app.request(h.url("a-0000000000000000.p"), put(big))).status).toBe(413);
+    expect((await h.app.request(h.url("a-0000000000000001.p"), put(big))).status).toBe(413);
   });
 
   test("slots expire, can be closed, and only a few are open at once", async () => {
