@@ -21,7 +21,7 @@ The object envelope's suite byte names the algorithms. FLOW-SYNC/2 defines suite
 
 | | Android | Desktop | Reference and server |
 |---|---|---|---|
-| Ed25519, X25519 | BouncyCastle `bcprov-jdk18on` (`Ed25519`, `X25519`); Conscrypt's API can't derive a public key from a seed, which recovery keys need | `ed25519-dalek`, `x25519-dalek` | `@noble/curves` |
+| Ed25519, X25519 | BouncyCastle `bcprov-jdk18on` (`Ed25519`, `X25519`); Conscrypt's API can't derive a public key from a seed, which recovery keys need | `ed25519-dalek`, `x25519-dalek` | `@noble/curves`; the server verifies signatures with WebCrypto, behind the [checks below](#ed25519-checks) |
 | HPKE | Conscrypt 2.6.1, already bundled in Flow (`Conscrypt.newProvider()`, `HpkeContextSender`/`HpkeContextRecipient`) | `hpke` | `@hpke/core` |
 | HKDF, HMAC, SHA-256 | JCE `HmacSHA256`, `SHA-256` | `hkdf`, `hmac`, `sha2` | `@noble/hashes` |
 | AES-256-GCM | JCE `AES/GCM/NoPadding` | `aes-gcm` | `@noble/ciphers` |
@@ -30,11 +30,15 @@ The server only verifies Ed25519 signatures and computes hashes. It never unwrap
 
 ## Ed25519 checks
 
-Verification MUST use the cofactorless equation `[S]B = R + [k]A` and MUST reject:
+Verification checks `[S]B = R + [k]A` and MUST reject:
 
 - `S ≥ L` (the group order);
-- a non-canonical encoding of `A` or `R` (a y-coordinate ≥ 2<sup>255</sup> − 19);
-- a public key `A` whose encoding is one of the eight canonical encodings of a small-order point (listed in `vectors/ed25519.json`).
+- a non-canonical encoding of `A` or `R` (a y-coordinate ≥ 2<sup>255</sup> − 19, or x = 0 with the sign bit set);
+- an `A` or an `R` that is not a point of order exactly `L`. That covers the eight small-order points (listed in `vectors/ed25519.json`) and any point with a small-order part.
+
+With `A` and `R` both of order `L`, the cofactorless equation and the cofactored one (`[8][S]B = [8]R + [8][k]A`) give the same answer, so an implementation can keep the equation its library uses.
+
+An implementation that uses the cofactorless equation MAY check `A`'s order once, when the key enters the roster ([protocol.md](protocol.md)), instead of at every signature. For such an `A` the equation can only hold for an `R` of order `L` or for the identity, so it then needs only to refuse the eight small-order encodings of `R`. A test of `vectors/ed25519.json` applies the check on the key first.
 
 Honest signers never produce these cases, so the rules only matter for hostile input. Without them, two implementations could disagree about one signature, and devices could disagree about the roster.
 
@@ -200,4 +204,4 @@ The QR code holds the same 24 words separated by single spaces. Devices refuse a
 | Bulk encryption | AES-256-GCM with a derived key per box and a commitment | **Plain AES-GCM with random nonces**: a 2<sup>32</sup> cap per key that devices can't coordinate. **XChaCha20-Poly1305**: no RFC (the draft expired in 2020) and no Android API. **AES-GCM-SIV**: Android API 30+ only, and the Rust crate has never been audited. |
 | HPKE AEAD | AES-256-GCM | ChaCha20-Poly1305 needs Android API 28. |
 | Android library | Conscrypt 2.6.1, already in the APK, for HPKE; BouncyCastle for Ed25519 and X25519. With the BIP39 word list they add 14.7 KB to the FOSS APK after R8. | **Conscrypt alone**: its public API can't derive an Ed25519 public key from a seed, which recovery keys need. Tink, libsodium and a newer standalone Conscrypt cost 0.5 to 5 MB. |
-| Signature verification on the server | `@noble/curves`, strict mode | WebCrypto Ed25519 differs between runtimes in edge cases. |
+| Signature verification on the server | WebCrypto, which is native on Node and Workers, with a key's order checked once when it enters the roster | **`@noble/curves` for every signature**: about 1 ms each, too much for the Workers Free CPU limit. WebCrypto alone isn't enough: Node and workerd differ on an identity `R`, and neither checks `A`'s order. |

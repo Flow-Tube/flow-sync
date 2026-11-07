@@ -173,7 +173,7 @@ There is no browser client and no HTML; the headers below are set anyway.
 |---|---|---|---|
 | V11.1.1 | Key management policy | partly | Client keys are covered (`spec/crypto.md` Keys, `spec/protocol.md` Removal and Recovery); the server's token key and admin token have no documented lifecycle |
 | V11.1.2 | Cryptographic inventory | partly | `spec/crypto.md` Suite 1 lists the algorithms; the token HMAC key isn't listed |
-| V11.2.1 | Industry-validated implementations | met | WebCrypto Ed25519 and SHA-256 (`crypto.ts:6-18`), `@noble/hashes` HMAC (`auth/token.ts:2-3`) |
+| V11.2.1 | Industry-validated implementations | met | WebCrypto Ed25519 and SHA-256 (`crypto.ts:8-26`), `@noble/hashes` HMAC (`auth/token.ts:2-3`) |
 | V11.2.2 | Crypto agility | partly | Envelopes carry a suite byte (`spec/crypto.md` Suite 1); the token key can't be rotated and survives an admin reset (`group.ts:30`) |
 | V11.2.3 | At least 128-bit security | met | Ed25519, SHA-256, HMAC-SHA256 with a 256-bit key |
 | V11.3.1 to V11.3.3 | Block modes, ciphers and AEAD | n/a | The server never encrypts or decrypts; the apps use AES-256-GCM (`spec/crypto.md`) |
@@ -182,7 +182,7 @@ There is no browser client and no HTML; the headers below are set anyway.
 | V11.4.3 | Collision-resistant hashes of 256 bits | met | SHA-256 names blobs and stored objects (`routes/objects.ts:72`) |
 | V11.4.4 | Key derivation from passwords | n/a | No passwords |
 | V11.5.1 | CSPRNG, 128 bits | met | Challenges and the token key are 256 random bits (`routes/auth.ts:35`, `group.ts:100`) |
-| V11.6.1 | Approved signature algorithms | met | Ed25519 behind the reference key checks (`crypto.ts:14-18`); `crypto.test.ts` runs `spec/vectors/ed25519.json` |
+| V11.6.1 | Approved signature algorithms | met | Ed25519 behind the reference key checks (`crypto.ts:16-26`); `crypto.test.ts` runs `spec/vectors/ed25519.json` |
 
 ## V12 Secure Communication
 

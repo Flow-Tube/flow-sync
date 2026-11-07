@@ -1,15 +1,12 @@
-import { ED25519_TORSION_SUBGROUP } from "@noble/curves/ed25519.js";
 import {
   canonical,
   concat,
   derive,
   EMPTY,
   encodePayload,
-  fromHex,
   labeledHash,
   paddedSize,
   seal,
-  sign,
   u32,
   utf8,
 } from "../src/index.ts";
@@ -40,62 +37,6 @@ export function deriveVectors(): Vectors {
   return {
     cases,
     hashes: [{ label: "device", data: hex(data), hash: hex(labeledHash("device", data)) }],
-  };
-}
-
-const ORDER = 2n ** 252n + 27742317777372353535851937790883648493n;
-
-function addOrderToS(signature: Uint8Array): Uint8Array {
-  const s = signature.slice(32);
-  let value = BigInt(`0x${hex(s.reverse())}`) + ORDER;
-  const out = new Uint8Array(32);
-  for (let i = 0; i < 32; i++) {
-    out[i] = Number(value & 0xffn);
-    value >>= 8n;
-  }
-  return concat(signature.subarray(0, 32), out);
-}
-
-export function ed25519Vectors(): Vectors {
-  const message = utf8("FLOW-SYNC/2 vector message");
-  const signature = sign(device.A.sigSeed, message);
-  const identity = fromHex(ED25519_TORSION_SUBGROUP[0] as string);
-  const cases = [
-    { name: "valid", key: device.A.sigPublic, message, signature, valid: true },
-    {
-      name: "tampered-message",
-      key: device.A.sigPublic,
-      message: flip(message, 0),
-      signature,
-      valid: false,
-    },
-    { name: "wrong-key", key: device.B.sigPublic, message, signature, valid: false },
-    {
-      name: "non-canonical-s",
-      key: device.A.sigPublic,
-      message,
-      signature: addOrderToS(signature),
-      valid: false,
-    },
-    {
-      name: "small-order-key",
-      key: identity,
-      message,
-      signature: concat(identity, new Uint8Array(32)),
-      valid: false,
-    },
-  ];
-  return {
-    weakKeys: ED25519_TORSION_SUBGROUP,
-    // y = p + 3: a valid point of large order, but not the canonical encoding.
-    nonCanonicalKeys: ["f0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f"],
-    cases: cases.map((c) => ({
-      name: c.name,
-      publicKey: hex(c.key),
-      message: hex(c.message),
-      signature: hex(c.signature),
-      valid: c.valid,
-    })),
   };
 }
 
