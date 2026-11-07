@@ -15,8 +15,8 @@ const claimSchema = z.strictObject({ entry: z.unknown(), wraps: z.record(z.strin
 export function claimRoutes(config: Config, group: Group, guards: Guards) {
   return new Hono<AppEnv>().post(
     "/v1/claim",
-    limitBody(LIMITS.jsonBody),
     requireAdmin(config, guards),
+    limitBody(LIMITS.jsonBody),
     async (c) => {
       const body = await readJson(c, claimSchema);
       if (await group.roster()) throw new HttpError("conflict");
