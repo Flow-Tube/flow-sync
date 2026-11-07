@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { secureHeaders } from "hono/secure-headers";
-import { tokenDevice } from "./auth/device.ts";
+import { requestToken } from "./auth/device.ts";
 import type { Config } from "./config.ts";
 import type { AppEnv } from "./env.ts";
 import { Group } from "./group.ts";
@@ -52,7 +52,7 @@ export function createApp<L extends LiveRelay>(deps: AppDeps<L>) {
   });
   const guards = createGuards(deps.clientIp, deps.now);
   const group = new Group(deps.storage.meta);
-  app.use(guardRequests(guards, tokenDevice(group, deps.now)));
+  app.use(guardRequests(guards, requestToken(group, deps.now)));
   app.onError((error, c) => {
     c.set("errorCode", errorCode(error));
     if (errorCode(error) === "internal") c.set("errorName", error.name);

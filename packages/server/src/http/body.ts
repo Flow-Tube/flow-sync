@@ -14,6 +14,8 @@ export function limitBody(maxSize: number): MiddlewareHandler<AppEnv> {
   });
 }
 
+const BEARER = "bearer.";
+
 function requireType(c: Context, type: string): void {
   if (c.req.header("content-type")?.split(";")[0]?.trim() !== type)
     throw new HttpError("unsupported");
@@ -38,6 +40,16 @@ export async function readBytes(c: Context): Promise<Uint8Array<ArrayBuffer>> {
 export function bearer(c: Context): string | undefined {
   const header = c.req.header("authorization");
   return header?.startsWith("Bearer ") ? header.slice(7) : undefined;
+}
+
+/** Browsers can't set headers on a WebSocket, so the token travels as a subprotocol. */
+export function liveToken(c: Context): string | undefined {
+  const protocols =
+    c.req
+      .header("sec-websocket-protocol")
+      ?.split(",")
+      .map((p) => p.trim()) ?? [];
+  return protocols.find((p) => p.startsWith(BEARER))?.slice(BEARER.length);
 }
 
 /** Stored bytes are only ever served as an attachment, never as content a client renders. */
