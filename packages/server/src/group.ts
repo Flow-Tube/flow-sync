@@ -102,7 +102,10 @@ export class Group {
         INSTANCE_SETTINGS.map((k) => this.#meta.getSetting(k)),
       );
       return { id: fromHex(id as string), secret: fromHex(secret as string) };
-    })();
+    })().catch((error) => {
+      this.#instance = undefined;
+      throw error;
+    });
     return this.#instance;
   }
 
