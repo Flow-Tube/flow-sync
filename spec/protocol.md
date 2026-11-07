@@ -22,10 +22,10 @@ An entry is a canonical JSON object:
 | `remove` | array | when removing | Hex `did`s, sorted |
 | `cut` | object | on `remove` and `leave`, for a device with objects | `did → {"seq": n, "hash": hex}`, the last object of that device's log the signer accepts ([Removal](#removal)) |
 | `epoch` | object | when starting an epoch | `{"n": e, "kc": b64(kc_e), "to": [did, …]}`, with `to` sorted |
-| `meta` | object | optional | `did → b64(Box(P_e,roster, "FLOW-SYNC/2 meta" ‖ group ‖ u64(seq) ‖ did, payload))`, where the payload content is canonical JSON `{"app", "name", "platform"}`, and `e` is the epoch in force after this entry |
+| `meta` | object | optional | `did → b64(Box(P_e,roster, "FLOW-SYNC/2 meta" ‖ group ‖ u64(seq) ‖ did, payload))`, where the payload content is canonical JSON `{"app", "name", "platform"}`, and `e` is the epoch in force after this entry. Each value MUST match `^[A-Za-z0-9_-]+$`. Past that it is opaque until its device opens it, so nobody checks its length or its trailing bits |
 | `sigs` | object | always | `did → b64(signature)` |
 
-Absent fields are omitted, never `null` or empty.
+Absent fields are omitted, never `null` or empty. An entry with `meta` as an empty object is refused.
 
 - **Signatures** cover `"FLOW-SYNC/2 roster" ‖ canonical(entry without "sigs")`.
 - **Entry hash** is `SHA-256(canonical(entry))`, including `sigs`. The next entry's `prev` is this hash.

@@ -1,4 +1,3 @@
-import { parseEntry } from "@flow-sync/protocol";
 import { Hono } from "hono";
 import { z } from "zod";
 import { requireAdmin } from "../auth/admin.ts";
@@ -20,7 +19,7 @@ export function claimRoutes(config: Config, group: Group, guards: Guards) {
     async (c) => {
       const body = await readJson(c, claimSchema);
       if (await group.roster()) throw new HttpError("conflict");
-      await group.append(parseEntry(body.entry), body.wraps);
+      await group.append(body.entry, body.wraps);
       return c.body(null, 201);
     },
   );
