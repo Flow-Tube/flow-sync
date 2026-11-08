@@ -22,7 +22,7 @@ export function rosterRoutes(deps: AuthDeps & { stored: Stored }) {
       const entries = await deps.meta.rosterAfter(after, LIMITS.rosterPage);
       return c.json({ entries: entries.map((json) => JSON.parse(json)) });
     })
-    .post("/v1/roster", limitBody(LIMITS.jsonBody), member, async (c) => {
+    .post("/v1/roster", member, limitBody(LIMITS.jsonBody), async (c) => {
       const body = await readJson(c, appendSchema);
       const state = await deps.group.claimed();
       if (c.req.header("if-match")?.replaceAll('"', "") !== state.head) {

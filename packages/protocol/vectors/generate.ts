@@ -1,16 +1,11 @@
 import { writeFile } from "node:fs/promises";
+import { ed25519Vectors } from "./ed25519.ts";
 import { envelopeVectors } from "./envelope.ts";
 import type { Vectors } from "./fixtures.ts";
 import { forkVectors } from "./forks.ts";
 import { keyVectors, recoveryVectors } from "./keys.ts";
 import { lanVectors, pairingVectors } from "./pairing.ts";
-import {
-  boxVectors,
-  canonicalVectors,
-  deriveVectors,
-  ed25519Vectors,
-  payloadVectors,
-} from "./primitives.ts";
+import { boxVectors, canonicalVectors, deriveVectors, payloadVectors } from "./primitives.ts";
 import { rosterVectors } from "./roster.ts";
 import { senderVectors } from "./senders.ts";
 
