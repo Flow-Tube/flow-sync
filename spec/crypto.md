@@ -166,7 +166,15 @@ Pad(n) = (n + mask) & ~mask
 
 PADMÉ ([Nikitin et al., PoPETs 2019](https://petsymposium.org/popets/2019/popets-2019-0056.php)) leaks O(log log n) bits of length with at most 12 % overhead.
 
-Decoders MUST reject a payload whose length field exceeds the payload, whose padding isn't all zeros, or whose gzip stream inflates beyond 64 MiB.
+`body` is exactly one gzip member and encoders MUST write `FLG` 0. Decoders MUST reject a payload:
+
+- whose length field exceeds the payload, or whose padding isn't all zeros;
+- whose body doesn't start with the bytes `1f 8b 08 00` (`ID1`, `ID2`, `CM` 8, `FLG` 0). `MTIME`, `XFL` and `OS`, the rest of the 10-byte header, aren't checked;
+- whose deflate stream doesn't end exactly where the 8-byte trailer starts, so that a second member, or any other byte, after the stream is refused;
+- whose trailer doesn't hold the content's CRC-32 and its length (`ISIZE`), both little-endian;
+- whose gzip stream inflates beyond 64 MiB.
+
+Libraries read gzip framing differently: some read through further members, some stop at the first, and some skip the trailer. Without these rules, devices could apply different data from one signed object.
 
 Compressing before encrypting leaks information only when an attacker can put chosen text next to a secret in the same compressed stream and watch the sizes many times. Each payload is compressed alone, padding hides fine-grained sizes, and no attacker-controlled input is mixed with secrets in one payload.
 
