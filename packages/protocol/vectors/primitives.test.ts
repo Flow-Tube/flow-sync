@@ -32,8 +32,8 @@ describe("ed25519", () => {
     test(c.name, () => {
       expect(verify(bytes(c.publicKey), bytes(c.message), bytes(c.signature))).toBe(c.valid);
     });
-  test("weak and non-canonical keys are rejected", () => {
-    for (const key of [...v.weakKeys, ...v.nonCanonicalKeys]) {
+  test("weak, non-canonical and mixed-order keys are rejected", () => {
+    for (const key of [...v.weakKeys, ...v.nonCanonicalKeys, ...v.mixedOrderKeys]) {
       expect(isValidSigningKey(bytes(key))).toBe(false);
     }
   });

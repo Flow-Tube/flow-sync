@@ -1,5 +1,6 @@
 import {
   canonical,
+  checkAddedKeys,
   checkEntry,
   type Entry,
   fail,
@@ -142,6 +143,7 @@ export class Group {
     if (json.length > LIMITS.rosterEntry) throw new HttpError("too_large");
     const before = await this.roster();
     const { state: after, signatures } = checkEntry(before, entry);
+    checkAddedKeys(entry);
     await verified(signatures);
     const appended = await this.#meta.appendRoster({
       seq: entry.seq,

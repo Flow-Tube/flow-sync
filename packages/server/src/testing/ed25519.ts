@@ -1,9 +1,9 @@
-import { fromHex } from "@flow-sync/protocol";
+import { fromHex, isValidSigningKey } from "@flow-sync/protocol";
 import { expect, test } from "vitest";
 import vectors from "../../../../spec/vectors/ed25519.json" with { type: "json" };
 import { verifySignature } from "../crypto.ts";
 
-/** The native verifier must accept exactly what the reference does, on every runtime. */
+/** The native verifier, behind the check a key passes to enter the roster, on every runtime. */
 export function ed25519VectorTests(runtime: string) {
   test(`${runtime} Ed25519 matches spec/vectors/ed25519.json`, async () => {
     for (const c of vectors.cases) {
@@ -12,7 +12,8 @@ export function ed25519VectorTests(runtime: string) {
         message: fromHex(c.message),
         signature: fromHex(c.signature),
       };
-      expect(await verifySignature(check), c.name).toBe(c.valid);
+      const accepted = isValidSigningKey(check.key) && (await verifySignature(check));
+      expect(accepted, c.name).toBe(c.valid);
     }
     const valid = vectors.cases.find((c) => c.valid);
     for (const key of [...vectors.weakKeys, ...vectors.nonCanonicalKeys]) {
@@ -22,6 +23,9 @@ export function ed25519VectorTests(runtime: string) {
         signature: fromHex(valid?.signature ?? ""),
       };
       expect(await verifySignature(check), key).toBe(false);
+    }
+    for (const key of vectors.mixedOrderKeys) {
+      expect(isValidSigningKey(fromHex(key)), key).toBe(false);
     }
   });
 }

@@ -18,8 +18,10 @@ import {
   type Subject,
   sealDeviceMeta,
   signEntry,
+  signingBytes,
   toB64,
 } from "../src/index.ts";
+import { mixedOrderKey, signBothEquations, signIdentityR } from "./ed25519.ts";
 import { device, epochKeys, group, hex, rand, recovery, type Vectors } from "./fixtures.ts";
 
 const { A, B, C } = device;
@@ -165,6 +167,18 @@ function negatives(entries: Chain) {
     kem: toB64(C.kemPublic),
     role: "device",
   };
+  const mixed = mixedOrderKey(rand("mixed sig"));
+  const mixedDid = hex(memberId(mixed.key, C.kemPublic));
+  const mixedAdd = entry(
+    e0,
+    {
+      op: "add",
+      signer: did(A),
+      add: [{ did: mixedDid, sig: toB64(mixed.key), kem: toB64(C.kemPublic), role: "device" }],
+    },
+    [A],
+  );
+  const identityR = entry(e0, { op: "rename", signer: did(A), meta: { [did(A)]: "AA" } }, []);
   const oneObject = { seq: 1, hash: hex(rand("an object")) };
   const wrongSeq = signEntry(
     { ...entry(e0, { op: "rename", signer: did(A), meta: e0.meta ?? {} }, []), seq: 5 },
@@ -250,6 +264,27 @@ function negatives(entries: Chain) {
       base: 1,
       entry: entry(e0, { op: "add", signer: did(A), add: [weak] }, [A]),
       error: "roster-key",
+    },
+    {
+      name: "mixed-order-key",
+      base: 1,
+      entry: {
+        ...mixedAdd,
+        sigs: {
+          ...mixedAdd.sigs,
+          [mixedDid]: toB64(signBothEquations(mixed, signingBytes(mixedAdd))),
+        },
+      },
+      error: "roster-key",
+    },
+    {
+      name: "small-order-r",
+      base: 1,
+      entry: {
+        ...identityR,
+        sigs: { [did(A)]: toB64(signIdentityR(A.sigSeed, signingBytes(identityR))) },
+      },
+      error: "roster-signature",
     },
     {
       name: "readd-removed-device",
