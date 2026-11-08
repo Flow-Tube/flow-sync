@@ -15,10 +15,10 @@ export function issueToken(secret: Uint8Array, did: Uint8Array, expires: number)
   return toB64(concat(body, mac(secret, body)));
 }
 
-export function readToken(
+/** The token's claims when the server issued it, expired or not. */
+export function tokenClaims(
   secret: Uint8Array,
   token: string,
-  now: number,
 ): { did: string; expires: number } | undefined {
   let bytes: Uint8Array;
   try {
@@ -29,6 +29,10 @@ export function readToken(
   if (bytes.length !== DID + EXPIRES + MAC) return undefined;
   const body = bytes.subarray(0, DID + EXPIRES);
   if (!equalBytes(mac(secret, body), bytes.subarray(DID + EXPIRES))) return undefined;
-  const expires = readU64(bytes, DID);
-  return expires > now ? { did: toHex(bytes.subarray(0, DID)), expires } : undefined;
+  return { did: toHex(bytes.subarray(0, DID)), expires: readU64(bytes, DID) };
+}
+
+export function readToken(secret: Uint8Array, token: string, now: number) {
+  const claims = tokenClaims(secret, token);
+  return claims && claims.expires > now ? claims : undefined;
 }
