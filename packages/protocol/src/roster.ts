@@ -16,6 +16,7 @@ import { groupId, memberId } from "./keys.ts";
 const hex = (bytes: number) => z.string().regex(new RegExp(`^[0-9a-f]{${bytes * 2}}$`));
 const b64 = (bytes: number) => z.string().refine((s) => decodesTo(s, bytes));
 const did = hex(16);
+const nonEmpty = (record: Record<string, unknown>) => Object.keys(record).length > 0;
 
 function decodesTo(value: string, length: number): boolean {
   try {
@@ -49,12 +50,12 @@ const entrySchema = z.strictObject({
   signer: did,
   add: z.array(subjectSchema).min(1).optional(),
   remove: z.array(did).min(1).optional(),
-  cut: z
-    .record(did, cutSchema)
-    .refine((cut) => Object.keys(cut).length > 0)
-    .optional(),
+  cut: z.record(did, cutSchema).refine(nonEmpty).optional(),
   epoch: z.strictObject({ n: z.int().min(0), kc: b64(32), to: z.array(did).min(1) }).optional(),
-  meta: z.record(did, z.string().min(1)).optional(),
+  meta: z
+    .record(did, z.string().regex(/^[A-Za-z0-9_-]+$/))
+    .refine(nonEmpty)
+    .optional(),
   sigs: z.record(did, b64(64)),
 });
 

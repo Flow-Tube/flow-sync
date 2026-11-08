@@ -105,7 +105,7 @@ A member opens a slot with `slot = Hash("pair", t)[0..16]`. Knowing the slot id 
 |---|---|
 | JSON request body | 64 KiB |
 | Object or blob | 4 MiB |
-| Roster entry | 16 KiB |
+| Roster entry | 16 KiB of UTF-8 |
 | Roster page | 500 entries |
 | Cursor page | 1,000 objects |
 | Body read timeout | 30 s |

@@ -1,4 +1,3 @@
-import { parseEntry } from "@flow-sync/protocol";
 import { Hono } from "hono";
 import { z } from "zod";
 import { type AuthDeps, requireMember } from "../auth/device.ts";
@@ -29,7 +28,7 @@ export function rosterRoutes(deps: AuthDeps & { stored: Stored }) {
       if (c.req.header("if-match")?.replaceAll('"', "") !== state.head) {
         throw new HttpError("conflict", { head: state.head });
       }
-      await deps.group.append(parseEntry(body.entry), body.wraps, body.chain);
+      await deps.group.append(body.entry, body.wraps, body.chain);
       await deps.stored(c.get("did"));
       return c.body(null, 201);
     });

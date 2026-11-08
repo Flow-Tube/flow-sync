@@ -167,6 +167,14 @@ function negatives(entries: Chain) {
     kem: toB64(C.kemPublic),
     role: "device",
   };
+  const metaRename = (value: string) =>
+    entry(e0, { op: "rename", signer: did(A), meta: { [did(A)]: value } }, [A]);
+  const refusedMeta = (name: string, value: string) => ({
+    name,
+    base: 1,
+    entry: metaRename(value),
+    error: "roster-format",
+  });
   const mixed = mixedOrderKey(rand("mixed sig"));
   const mixedDid = hex(memberId(mixed.key, C.kemPublic));
   const mixedAdd = entry(
@@ -346,6 +354,20 @@ function negatives(entries: Chain) {
         [R1, D],
       ),
       error: "roster-signer",
+    },
+    refusedMeta("meta-not-base64url", "not base64url!"),
+    refusedMeta("meta-padded", "AAAA="),
+    refusedMeta("meta-non-ascii", "\u20ac"),
+    refusedMeta("meta-trailing-newline", "AAAA\n"),
+    refusedMeta("meta-empty-value", ""),
+    {
+      name: "empty-meta",
+      base: 1,
+      entry: entry(e0, { op: "add", signer: did(A), add: [subject(C, "device")], meta: {} }, [
+        A,
+        C,
+      ]),
+      error: "roster-format",
     },
     {
       name: "leave-by-non-member",
@@ -530,7 +552,20 @@ function replacements(entries: Chain) {
     [N],
   );
   const view = (...steps: Entry[]) => stateView(replayRoster([...entries, ...steps]));
+  // "AB" and "A" can't be decoded strictly, and a value is opaque until its device opens it.
+  const opaqueMeta = (value: string) =>
+    entry(e8, { op: "rename", signer: did(A), meta: { [did(A)]: value } }, [A]);
   return [
+    {
+      name: "meta-with-trailing-bits",
+      steps: [opaqueMeta("AB")],
+      state: view(opaqueMeta("AB")),
+    },
+    {
+      name: "meta-of-an-undecodable-length",
+      steps: [opaqueMeta("A")],
+      state: view(opaqueMeta("A")),
+    },
     {
       name: "removing-the-device-that-set-the-key-replaces-it",
       steps: [removeC(true)],
