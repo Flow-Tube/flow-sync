@@ -44,7 +44,7 @@ Status is `met`, `partly`, `gap` or `n/a`. Paths are relative to `packages/serve
 | V2.3.2 | Business limits as documented | met | `limits.ts` enforced for slots (`routes/pair.ts:34`), mailbox messages (`routes/pair.ts:42`), join requests (`routes/join.ts:39`) and quota (`routes/objects.ts:79`) |
 | V2.3.3 | Operations succeed whole or roll back | met | An entry, its wraps and chain are stored in one batch or transaction (`storage/sqlite-store.ts:133-160`, `storage/postgres.ts:140`); `routes/roster.test.ts` "an append naming a stale head is refused with the current head" |
 | V2.3.4 | Locking for limited resources | partly | Slots and join requests are capped atomically (`storage/sqlite-store.ts:233-241`, `:274-283`), but the quota check reads usage before the write (`routes/objects.ts:79-86`), so concurrent uploads can pass it together |
-| V2.4.1 | Anti-automation | partly | Limits per address, per device and per live socket (`limits/guards.ts`, `live/hub.ts:76-83`), but the per-address limit doesn't cover every request to routes that need no token (`limits/guards.ts:49`); on Workers limits are per isolate (`docs/cloudflare.md`) |
+| V2.4.1 | Anti-automation | partly | Limits per address, per device and per live socket (`limits/guards.ts`, `live/hub.ts:76-83`); on Workers limits are per isolate (`docs/cloudflare.md`) |
 
 ## V3 Web Frontend Security
 
@@ -100,11 +100,11 @@ There is no browser client and no HTML; the headers below are set anyway.
 
 | Id | Requirement (short) | Status | Where / why |
 |---|---|---|---|
-| V6.1.1 | Document brute-force defenses and lockout | partly | `spec/api.md` Limits. Bans are per address, so every client behind one address, or behind the `"unknown"` fallback (`limits/guards.ts:47`, `auth/admin.ts:12`), is banned together |
+| V6.1.1 | Document brute-force defenses and lockout | partly | `spec/api.md` Limits. Bans are per address, so every client behind one address, or behind the `"unknown"` fallback (`limits/guards.ts:65`, `auth/admin.ts:12`), is banned together |
 | V6.1.2 | Context-specific password word list | n/a | No passwords |
 | V6.1.3 | Document every authentication pathway | met | `spec/api.md` Authentication, Admin token and Pairing mailbox; the recovery member in `spec/protocol.md` Recovery |
 | V6.2.1 to V6.2.12 | Password security | n/a | No passwords. The admin token must be at least 32 characters (`config.ts:7`) |
-| V6.3.1 | Brute-force controls | met | Nothing to guess in an Ed25519 challenge; failure bans (`limits/guards.ts:45-53`, `auth/admin.ts:13-19`); `limits/guards.test.ts` "repeated failed authentication bans the address", "wrong admin tokens ban the address sooner" |
+| V6.3.1 | Brute-force controls | met | Nothing to guess in an Ed25519 challenge; failure waits and bans (`limits/guards.ts:59-71`, `limits/counters.ts`, `auth/admin.ts:13-19`); `limits/guards.test.ts` "repeated failed authentication bans the address", "failed authentication makes the address wait before the ban", "wrong admin tokens ban the address sooner" |
 | V6.3.2 | No default accounts | met | No admin token unless the operator sets one (`auth/admin.ts:16`); `routes/claim.test.ts` "a wrong or missing admin token is refused" |
 | V6.3.3 | Multi-factor or combined factors | partly | Devices prove a keystore-held Ed25519 key (`routes/auth.ts:55-58`) and the operator a static token, each a single factor; `spec/api.md` gives the rationale for device tokens only |
 | V6.3.4 | No undocumented pathways | met | The routes in `app.ts:58-71` are the ones in `spec/api.md` Endpoints |
@@ -122,14 +122,14 @@ There is no browser client and no HTML; the headers below are set anyway.
 | V7.1.1 | Document inactivity and absolute lifetime | partly | 15 minutes absolute in `spec/api.md`; no reasoning against NIST SP 800-63B |
 | V7.1.2 | Document concurrent sessions | partly | Two live connections per device (`spec/live.md`); valid HTTP tokens per device are unlimited and undocumented |
 | V7.1.3 | Federated session coordination | n/a | No federation |
-| V7.2.1 | Verify tokens on the backend | met | `auth/device.ts:29-31` |
+| V7.2.1 | Verify tokens on the backend | met | `auth/device.ts:43-44` |
 | V7.2.2 | Dynamic tokens, not static API secrets | partly | Device tokens are issued per challenge (`routes/auth.ts:59-60`); the admin token is a static secret sent on every admin call (`auth/admin.ts:14-16`) |
 | V7.2.3 | Reference tokens from a CSPRNG, 128 bits | n/a | Tokens are self-contained (V9) |
-| V7.2.4 | New token on authentication, old one ended | partly | Each sign-in issues a new token; earlier ones stay valid until they expire (`auth/token.ts:33`) |
+| V7.2.4 | New token on authentication, old one ended | partly | Each sign-in issues a new token; earlier ones stay valid until they expire (`auth/token.ts:37`) |
 | V7.3.1 | Inactivity timeout | met | The 15-minute absolute lifetime is shorter than any useful inactivity timeout |
-| V7.3.2 | Absolute session lifetime | met | `limits.ts:19`, enforced in `auth/token.ts:33` and for sockets in `live/hub.ts:78`, `:111`; `routes/auth.test.ts` "tokens expire and can't be altered" |
+| V7.3.2 | Absolute session lifetime | met | `limits.ts:19`, enforced in `auth/token.ts:37` and for sockets in `live/hub.ts:78`, `:111`; `routes/auth.test.ts` "tokens expire and can't be altered" |
 | V7.4.1 | Ended sessions can't be used | partly | Expiry and removal end a token; there's no sign-out that ends one early |
-| V7.4.2 | Disabled accounts lose every session | met | Membership is checked on every request (`auth/device.ts:30`) and by the socket sweep (`live/hub.ts:106-115`); `routes/roster.test.ts` "removal needs every wrap and the chain, and revokes the device at once", `routes/live.test.ts` "a removed device is disconnected by the sweep" |
+| V7.4.2 | Disabled accounts lose every session | met | Membership is checked on every request (`auth/device.ts:46`) and by the socket sweep (`live/hub.ts:106-115`); `routes/roster.test.ts` "removal needs every wrap and the chain, and revokes the device at once", `routes/live.test.ts` "a removed device is disconnected by the sweep" |
 | V7.4.3 | End other sessions after a factor change | n/a | Device keys never change within a membership (`spec/crypto.md` Device keys) |
 | V7.4.4 | Visible logout | n/a | No user interface |
 | V7.4.5 | Administrators can end sessions | met | Any member removes a device; an admin reset ends every session (`routes/admin.ts:36-42`) |
@@ -143,7 +143,7 @@ There is no browser client and no HTML; the headers below are set anyway.
 |---|---|---|---|
 | V8.1.1 | Document function and data access rules | met | `spec/api.md` Endpoints (Auth column), Objects |
 | V8.1.2 | Document field-level rules | n/a | Objects are opaque and JSON bodies have fixed shapes, so no rule is per field |
-| V8.2.1 | Function-level access | met | `requireMember` or `requireAdmin` on every protected route; the recovery member only where a route opts in (`auth/device.ts:32`); `routes/auth.test.ts` "the recovery member authenticates but can't use device routes", `routes/join.test.ts` "asking needs the admin token, answering needs a member" |
+| V8.2.1 | Function-level access | met | `requireMember` or `requireAdmin` on every protected route; the recovery member only where a route opts in (`auth/device.ts:47`); `routes/auth.test.ts` "the recovery member authenticates but can't use device routes", `routes/join.test.ts` "asking needs the admin token, answering needs a member" |
 | V8.2.2 | Data-specific access (IDOR, BOLA) | met | Own wrap only (`routes/keys.ts:14`), writes only under the caller's id (`routes/objects.ts:70`), deletes only its own or removed devices' paths (`routes/objects.ts:103`); `routes/keys.test.ts` "a member reads its own wrap and the chain, nothing else", `routes/objects.test.ts` "a device can't write as another device, and the recovery key can't write" |
 | V8.2.3 | Field-level access (BOPLA) | met | Strict request schemas; responses list fixed fields (`routes/status.ts:13-15`, `routes/admin.ts:28-34`) |
 | V8.3.1 | Authorization at a trusted layer | met | All checks are server middleware (`auth/`) |
@@ -153,10 +153,10 @@ There is no browser client and no HTML; the headers below are set anyway.
 
 | Id | Requirement (short) | Status | Where / why |
 |---|---|---|---|
-| V9.1.1 | Check the signature or MAC first | met | HMAC-SHA256 checked before the content is read (`auth/token.ts:29-33`) |
+| V9.1.1 | Check the signature or MAC first | met | HMAC-SHA256 checked before the content is read (`auth/token.ts:31-37`) |
 | V9.1.2 | Algorithm allowlist, no `none` | met | One fixed algorithm and no header |
 | V9.1.3 | Keys from a trusted source | met | The instance secret lives in the server's own store (`group.ts:97-107`) |
-| V9.2.1 | Check the validity period | met | `auth/token.ts:33` |
+| V9.2.1 | Check the validity period | met | `auth/token.ts:37` |
 | V9.2.2 | Correct token type | met | One token type, MAC domain-separated (`auth/token.ts:9-10`) |
 | V9.2.3 | Correct audience | met | The MAC key is per instance |
 | V9.2.4 | Audience restriction for shared keys | n/a | The key serves one audience |
@@ -224,7 +224,7 @@ There is no browser client and no HTML; the headers below are set anyway.
 | V14.2.1 | No sensitive data in URLs | partly | Tokens travel in headers (`http/body.ts:38-41`, `routes/live.ts:10-17`), but the pairing slot id, a short-lived capability, is a path segment (`routes/pair.ts:10-11`) that host access logs can record |
 | V14.2.2 | No caching in server components | met | `Cache-Control: no-store` on every response (`app.ts:43-46`); `app.test.ts` "every response carries the security headers" |
 | V14.2.3 | No data to untrusted parties | met | No third-party calls or trackers |
-| V14.2.4 | Data controls as documented | met | Logs hold route pattern, status, size, time and error code (`http/log.ts:8-22`); addresses stay in bounded memory maps (`limits/counters.ts`); `app.test.ts` "unknown routes answer not_found without echoing the path" |
+| V14.2.4 | Data controls as documented | met | Logs hold route pattern, status, size, time and error code (`http/log.ts:8-22`); addresses stay in bounded memory maps until their window or ban ends (`limits/counters.ts`); `app.test.ts` "unknown routes answer not_found without echoing the path" |
 | V14.3.1 | Clear client storage | n/a | No browser client |
 | V14.3.2 | Anti-caching headers | met | `app.ts:45` |
 | V14.3.3 | No sensitive data in browser storage | n/a | No browser client |
@@ -266,7 +266,7 @@ There is no browser client and no HTML; the headers below are set anyway.
 | V16.4.3 | Send logs to a separate system | partly | Hosts collect them separately; the Docker template keeps them on the same machine |
 | V16.5.1 | Generic error messages | met | `{"error":"<code>"}` only (`http/errors.ts:42-49`); `app.test.ts` "unknown routes answer not_found without echoing the path" |
 | V16.5.2 | Keep working when resources fail | met | Storage errors end as 500 `internal`; the Postgres pool survives lost connections (`storage/postgres.ts:67-73`) |
-| V16.5.3 | Fail closed | met | Authentication throws before a handler runs (`auth/device.ts:31`, `auth/admin.ts:16-19`); objects are checked before they're stored (`routes/objects.ts:78-80`) |
+| V16.5.3 | Fail closed | met | Authentication throws before a handler runs (`auth/device.ts:44`, `auth/admin.ts:16-19`); objects are checked before they're stored (`routes/objects.ts:78-80`) |
 
 ## V17 WebRTC
 

@@ -444,6 +444,7 @@ function replacements(entries: Chain) {
   const [, , e2, , , , , , e8] = entries;
   const R3 = memberSecrets(rand("R3 sig"), rand("R3 kem"));
   const E = memberSecrets(rand("E sig"), rand("E kem"));
+  const N = memberSecrets(rand("N sig"), rand("N kem"));
   const newKey = (label: string, n: number, members: MemberSecrets[]) =>
     epochDraft(rand(`replacement ${label}`), group, n, members);
   const removeC = (replace: boolean, cut = false) =>
@@ -496,6 +497,38 @@ function replacements(entries: Chain) {
     },
     [A, R2],
   );
+  const restoreN = entry(
+    e8,
+    {
+      op: "restore",
+      signer: did(R2),
+      add: [subject(N, "device")],
+      epoch: newKey("restore N", 5, [A, C, N, R2]),
+    },
+    [R2, N],
+  );
+  const replaceAfterRestore = entry(
+    restoreN,
+    {
+      op: "recovery",
+      signer: did(N),
+      remove: [did(R2)],
+      add: [subject(R3, "recovery")],
+      epoch: newKey("replace after restore", 6, [A, C, N, R3]),
+    },
+    [N, R3],
+  );
+  const removeOthers = entry(
+    replaceAfterRestore,
+    {
+      op: "remove",
+      signer: did(N),
+      remove: [did(A), did(C)].sort(),
+      cut: { [did(A)]: { seq: 1, hash: hex(rand("last object of A")) } },
+      epoch: newKey("remove others", 7, [N, R3]),
+    },
+    [N],
+  );
   const view = (...steps: Entry[]) => stateView(replayRoster([...entries, ...steps]));
   return [
     {
@@ -531,6 +564,11 @@ function replacements(entries: Chain) {
       state: view(addE, cLeaves, replaced),
     },
     { name: "replacement-not-called-for", base: 3, steps: [notDue], error: "roster-op" },
+    {
+      name: "restore-then-remove-the-other-devices",
+      steps: [restoreN, replaceAfterRestore, removeOthers],
+      state: view(restoreN, replaceAfterRestore, removeOthers),
+    },
   ];
 }
 

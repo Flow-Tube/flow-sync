@@ -1,11 +1,11 @@
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { AppEnv } from "../env.ts";
 import type { Group } from "../group.ts";
-import { bearer } from "../http/body.ts";
+import { bearer, liveToken } from "../http/body.ts";
 import { HttpError } from "../http/errors.ts";
-import { checkRate, type Guards, type TokenDevice } from "../limits/guards.ts";
+import type { Guards, RequestToken } from "../limits/guards.ts";
 import type { MetaStore } from "../storage/types.ts";
-import { readToken } from "./token.ts";
+import { readToken, tokenClaims } from "./token.ts";
 
 export interface AuthDeps {
   group: Group;
@@ -14,11 +14,17 @@ export interface AuthDeps {
   guards: Guards;
 }
 
-/** Checks only the token's MAC and expiry, which needs no storage read once the secret is loaded. */
-export function tokenDevice(group: Group, now: () => number): TokenDevice {
-  return async (c) => {
-    const token = bearer(c);
-    return token && readToken((await group.instance()).secret, token, now())?.did;
+/** Reads the roster only for a token the server issued, and keeps it for the rest of the request. */
+export function requestToken(group: Group, now: () => number) {
+  return async (c: Context<AppEnv>): Promise<RequestToken> => {
+    const token = bearer(c) ?? liveToken(c);
+    const claims = token && tokenClaims((await group.instance()).secret, token);
+    if (!claims) return {};
+    if (claims.expires <= now()) return { expired: true };
+    const state = await group.roster();
+    if (!state?.members.has(claims.did)) return {};
+    c.set("roster", state);
+    return { did: claims.did };
   };
 }
 
@@ -31,12 +37,11 @@ export function requireMember(
   { allowRecovery = false, token: tokenOf = bearer } = {},
 ): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
-    const state = await deps.group.claimed();
+    const state = c.get("roster") ?? (await deps.group.claimed());
     const { secret } = await deps.group.instance();
     const token = tokenOf(c);
     const claims = token ? readToken(secret, token, deps.now()) : undefined;
     if (!claims) throw new HttpError("unauthorized");
-    checkRate(deps.guards.devices, claims.did, deps.now());
     const member = state.members.get(claims.did);
     if (!member) throw new HttpError("unauthorized");
     if (member.role === "recovery" && !allowRecovery) throw new HttpError("forbidden");

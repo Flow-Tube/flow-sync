@@ -27,7 +27,7 @@ export function pairRoutes(deps: AuthDeps) {
   }
 
   return new Hono<AppEnv>()
-    .post("/v1/pair", limitBody(LIMITS.jsonBody), member, async (c) => {
+    .post("/v1/pair", member, limitBody(LIMITS.jsonBody), async (c) => {
       const { slot } = await readJson(c, openSchema);
       const expires = now() + LIMITS.pairMs;
       if (!(await meta.openSlot(slot, expires, LIMITS.pairSlots, now()))) {
