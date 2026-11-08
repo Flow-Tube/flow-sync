@@ -32,7 +32,7 @@ export function joinRoutes(deps: AuthDeps, config: Config, guards: Guards) {
   };
 
   return new Hono<AppEnv>()
-    .post("/v1/join", limitBody(LIMITS.jsonBody), admin, async (c) => {
+    .post("/v1/join", admin, limitBody(LIMITS.jsonBody), async (c) => {
       await group.claimed();
       const body = await readJson(c, requestSchema);
       const expires = now() + LIMITS.pairMs;
@@ -42,7 +42,7 @@ export function joinRoutes(deps: AuthDeps, config: Config, guards: Guards) {
       return c.json({ expires }, 201);
     })
     .get("/v1/join", member, async (c) => c.json({ requests: await meta.openJoinRequests(now()) }))
-    .put(`/v1/join/${ID}`, limitBody(LIMITS.jsonBody), member, async (c) => {
+    .put(`/v1/join/${ID}`, member, limitBody(LIMITS.jsonBody), async (c) => {
       const { code } = await readJson(c, answerSchema);
       return settled(c, await meta.answerJoinRequest(id(c), code, now()), 201);
     })

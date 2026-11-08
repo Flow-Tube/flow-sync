@@ -31,7 +31,7 @@ They can't:
 
 ## The admin token
 
-The admin token claims the instance once, lets a device ask to join with it (a member still has to accept), shows usage, and resets the instance. The server keeps only its SHA-256 and compares in constant time; five wrong tries ban the address for 15 minutes. It is a static secret, so keep it in the host's secret store and set `FLOW_SYNC_ADMIN=off` once the group is set up. Turning admin off doesn't affect linked devices.
+The admin token claims the instance once, lets a device ask to join with it (a member still has to accept), shows usage, and resets the instance. The server keeps only its SHA-256 and compares in constant time; five wrong tries ban the address for 15 minutes. It is a static secret, so keep it in the host's secret store and set `FLOW_SYNC_ADMIN=off` once the group is set up. Turning admin off doesn't affect linked devices. Flow doesn't store the token on a device, but removing a device doesn't change it either: if a device it was entered on is lost, or anyone may have seen it, set a new value and restart the server.
 
 ## Device tokens
 

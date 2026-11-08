@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { concat, fromB64, toB64, toHex, utf8 } from "./bytes.ts";
 import { canonical, type Json } from "./canonical.ts";
-import { isValidSigningKey, type SignatureCheck, sign, verify } from "./curve.ts";
+import {
+  isValidSigningKey,
+  isWellFormedSigningKey,
+  type SignatureCheck,
+  sign,
+  verify,
+} from "./curve.ts";
 import { ZERO_HASH } from "./envelope.ts";
 import { fail } from "./errors.ts";
 import { sha256, tag } from "./kdf.ts";
@@ -10,6 +16,7 @@ import { groupId, memberId } from "./keys.ts";
 const hex = (bytes: number) => z.string().regex(new RegExp(`^[0-9a-f]{${bytes * 2}}$`));
 const b64 = (bytes: number) => z.string().refine((s) => decodesTo(s, bytes));
 const did = hex(16);
+const nonEmpty = (record: Record<string, unknown>) => Object.keys(record).length > 0;
 
 function decodesTo(value: string, length: number): boolean {
   try {
@@ -43,12 +50,12 @@ const entrySchema = z.strictObject({
   signer: did,
   add: z.array(subjectSchema).min(1).optional(),
   remove: z.array(did).min(1).optional(),
-  cut: z
-    .record(did, cutSchema)
-    .refine((cut) => Object.keys(cut).length > 0)
-    .optional(),
+  cut: z.record(did, cutSchema).refine(nonEmpty).optional(),
   epoch: z.strictObject({ n: z.int().min(0), kc: b64(32), to: z.array(did).min(1) }).optional(),
-  meta: z.record(did, z.string().min(1)).optional(),
+  meta: z
+    .record(did, z.string().regex(/^[A-Za-z0-9_-]+$/))
+    .refine(nonEmpty)
+    .optional(),
   sigs: z.record(did, b64(64)),
 });
 
@@ -160,7 +167,7 @@ function checkShape(entry: Entry): void {
 function checkSubject(subject: Subject, senders: ReadonlyMap<string, Sender>): Member {
   const sig = fromB64(subject.sig);
   const kem = fromB64(subject.kem);
-  if (!isValidSigningKey(sig)) fail("roster-key");
+  if (!isWellFormedSigningKey(sig)) fail("roster-key");
   if (toHex(memberId(sig, kem)) !== subject.did || senders.has(subject.did)) fail("roster-key");
   return { sig, kem, role: subject.role, used: false };
 }
@@ -206,9 +213,20 @@ function checkSigner(entry: Entry, state: RosterState | undefined, added: Map<st
   return signer;
 }
 
+/**
+ * That every key an entry adds has order L. Apart from `checkEntry` for its cost: a server runs
+ * this on an entry it is given, and not again each time it replays what it stored.
+ */
+export function checkAddedKeys(entry: Entry): void {
+  for (const { sig } of entry.add ?? []) {
+    if (!isValidSigningKey(fromB64(sig))) fail("roster-key");
+  }
+}
+
 /** Applies one entry to the state before it; throws a FlowSyncError if it is not valid. */
 export function applyEntry(state: RosterState | undefined, entry: Entry): RosterState {
   const checked = checkEntry(state, entry);
+  checkAddedKeys(entry);
   for (const { key, message, signature } of checked.signatures) {
     if (!verify(key, message, signature)) fail("roster-signature");
   }

@@ -40,6 +40,7 @@ describe("device authentication", () => {
     expect(await exchange(stale)).toBe(401);
     expect(await exchange(await challenge(app, did), newDevice())).toBe(401);
     const other = toHex(newDevice().did);
+    clock.now += 1000;
     const refused = await app.request("/v1/auth/challenge", postJson({ did: other }));
     expect(refused.status).toBe(401);
   });

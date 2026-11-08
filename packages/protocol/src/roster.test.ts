@@ -100,3 +100,18 @@ test("any changed, removed or added field of a signed entry is refused", async (
     fuzzRuns(),
   );
 });
+
+test("a meta value with a lone surrogate is refused, since it has no one UTF-8 form", () => {
+  const entry = {
+    v: 2,
+    group: "00".repeat(16),
+    seq: 1,
+    prev: "00".repeat(32),
+    op: "rename",
+    signer: "00".repeat(16),
+    meta: { ["00".repeat(16)]: "\ud800" },
+    sigs: {},
+  };
+  expect(() => parseEntry(entry)).toThrow(FlowSyncError);
+  expect(() => parseEntry({ ...entry, meta: { ["00".repeat(16)]: "AAAA" } })).not.toThrow();
+});

@@ -1,4 +1,9 @@
-import { isValidSigningKey, type SignatureCheck, toHex } from "@flow-sync/protocol";
+import {
+  isSmallOrderEncoding,
+  isWellFormedSigningKey,
+  type SignatureCheck,
+  toHex,
+} from "@flow-sync/protocol";
 
 // WebCrypto runs natively on Node and Workers. The pure-JS code costs about 3 ms per MiB hashed
 // and about 1 ms per signature, too much for the Workers Free CPU limit.
@@ -8,11 +13,13 @@ export async function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string>
 }
 
 /**
- * Ed25519 behind the reference's key check (canonical, not small order), which makes it accept
- * exactly what the reference accepts; spec/vectors/ed25519.json is tested on both runtimes.
+ * For keys that passed `checkAddedKeys`, so of order L. The runtimes' equation is cofactorless and
+ * compares R's bytes with its own canonical result, which then leaves only the identity to refuse;
+ * Node and workerd disagree on it. spec/vectors/ed25519.json is tested on both.
  */
 export async function verifySignature({ key, message, signature }: SignatureCheck) {
-  if (!isValidSigningKey(key) || signature.length !== 64) return false;
+  if (!isWellFormedSigningKey(key) || signature.length !== 64) return false;
+  if (isSmallOrderEncoding(signature.subarray(0, 32))) return false;
   const publicKey = await crypto.subtle.importKey("raw", bytes(key), "Ed25519", false, ["verify"]);
   return crypto.subtle.verify("Ed25519", publicKey, bytes(signature), bytes(message));
 }

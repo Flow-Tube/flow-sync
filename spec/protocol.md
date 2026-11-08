@@ -22,10 +22,10 @@ An entry is a canonical JSON object:
 | `remove` | array | when removing | Hex `did`s, sorted |
 | `cut` | object | on `remove` and `leave`, for a device with objects | `did → {"seq": n, "hash": hex}`, the last object of that device's log the signer accepts ([Removal](#removal)) |
 | `epoch` | object | when starting an epoch | `{"n": e, "kc": b64(kc_e), "to": [did, …]}`, with `to` sorted |
-| `meta` | object | optional | `did → b64(Box(P_e,roster, "FLOW-SYNC/2 meta" ‖ group ‖ u64(seq) ‖ did, payload))`, where the payload content is canonical JSON `{"app", "name", "platform"}`, and `e` is the epoch in force after this entry |
+| `meta` | object | optional | `did → b64(Box(P_e,roster, "FLOW-SYNC/2 meta" ‖ group ‖ u64(seq) ‖ did, payload))`, where the payload content is canonical JSON `{"app", "name", "platform"}`, and `e` is the epoch in force after this entry. Each value MUST match `^[A-Za-z0-9_-]+$`. Past that it is opaque until its device opens it, so nobody checks its length or its trailing bits |
 | `sigs` | object | always | `did → b64(signature)` |
 
-Absent fields are omitted, never `null` or empty.
+Absent fields are omitted, never `null` or empty. An entry with `meta` as an empty object is refused.
 
 - **Signatures** cover `"FLOW-SYNC/2 roster" ‖ canonical(entry without "sigs")`.
 - **Entry hash** is `SHA-256(canonical(entry))`, including `sigs`. The next entry's `prev` is this hash.
@@ -152,7 +152,7 @@ N pins the head from `welcome`. A store that later shows N a different history a
 
 ### Joining with the admin token
 
-On a Flow server, a new device can ask to join instead of scanning a code ([api.md](api.md)):
+On a Flow server, a new device can ask to join instead of scanning a code ([api.md](api.md)). A device keeps the admin token only in memory, for the request it was entered for, and never stores it.
 
 1. The new device posts a join request with the admin token: a random 16-byte `id` (hex) and its device name, at most 64 characters. A request lasts 180 seconds, and at most 3 are pending.
 2. Linked devices list pending requests while Linked devices is open and on each sync, and ask the user whether to accept the request, saying that the name isn't verified and to accept only if they started this on the other device.
@@ -210,9 +210,13 @@ To restore onto a new device, the user enters the words and the store location (
 
 1. Derives the recovery keys and reads and verifies the roster.
 2. Unwraps the latest `K_e` from the recovery member's wrap and checks `kc`.
-3. Creates fresh device keys, writes wraps of `K_(e+1)`, and appends a `restore` entry signed by the recovery key.
-4. Immediately creates a new recovery key, appends a `recovery` entry, and shows the new words.
-5. Reads every log, then links its Default profile like a `welcome` would. When change batches and snapshot manifests name one link for profile data, it joins that link; when they name none, it starts a link with its own profile id; when they name several, the user picks one from the `profiles` records, or starts a new link. It writes no batch before that.
+3. Shows the current devices by name and asks which ones the user still has. None is chosen by default, and the question says that restoring signs out every other device. Nothing is written before the answer.
+4. Creates fresh device keys, writes wraps of `K_(e+1)`, and appends a `restore` entry signed by the recovery key.
+5. Immediately creates a new recovery key, appends a `recovery` entry, and shows the new words.
+6. Reads every log, then [removes](#removal) every current device the user didn't choose. It works out that list when it removes, as all current devices except the chosen ones, so a device that appears after the question goes too. When there is none, it skips this step. A read the device cut short to stay within its own limits isn't finished: it keeps its place, goes on at the next sync, and removes only once it has reached the end. A log that stops at an object it can't get or has to discard ends there, as a gap does, since that object may never become readable.
+7. Links its Default profile like a `welcome` would. When change batches and snapshot manifests name one link for profile data, it joins that link; when they name none, it starts a link with its own profile id; when they name several, the user picks one from the `profiles` records, or starts a new link. It writes no batch before that.
+
+Rule 5 wraps the keys of steps 4 and 5 to every member, including devices the user no longer has. So until step 6 is done the device seals nothing under them but its own name in `meta`: no object and no live message. The device saves the answer with the group, so one that stops before then resumes at step 6. Devices are removed by default here, unlike in a [removal](#removal), because the user has said they lost them. A device that was still in use shows that it was removed, and can be linked again.
 
 Any device can append a `recovery` entry at any time, for example after losing the words. The old recovery member stops receiving epoch keys.
 
