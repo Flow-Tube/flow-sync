@@ -13,6 +13,7 @@ export const LIMITS = {
   devicePerMinute: 600,
   ipPerMinute: 120,
   authFailures: 10,
+  authBackoffFrom: 3,
   adminFailures: 5,
   banMs: 15 * 60 * 1000,
   challengeMs: 60 * 1000,

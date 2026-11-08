@@ -18,8 +18,10 @@ import {
   type Subject,
   sealDeviceMeta,
   signEntry,
+  signingBytes,
   toB64,
 } from "../src/index.ts";
+import { mixedOrderKey, signBothEquations, signIdentityR } from "./ed25519.ts";
 import { device, epochKeys, group, hex, rand, recovery, type Vectors } from "./fixtures.ts";
 
 const { A, B, C } = device;
@@ -165,6 +167,18 @@ function negatives(entries: Chain) {
     kem: toB64(C.kemPublic),
     role: "device",
   };
+  const mixed = mixedOrderKey(rand("mixed sig"));
+  const mixedDid = hex(memberId(mixed.key, C.kemPublic));
+  const mixedAdd = entry(
+    e0,
+    {
+      op: "add",
+      signer: did(A),
+      add: [{ did: mixedDid, sig: toB64(mixed.key), kem: toB64(C.kemPublic), role: "device" }],
+    },
+    [A],
+  );
+  const identityR = entry(e0, { op: "rename", signer: did(A), meta: { [did(A)]: "AA" } }, []);
   const oneObject = { seq: 1, hash: hex(rand("an object")) };
   const wrongSeq = signEntry(
     { ...entry(e0, { op: "rename", signer: did(A), meta: e0.meta ?? {} }, []), seq: 5 },
@@ -250,6 +264,27 @@ function negatives(entries: Chain) {
       base: 1,
       entry: entry(e0, { op: "add", signer: did(A), add: [weak] }, [A]),
       error: "roster-key",
+    },
+    {
+      name: "mixed-order-key",
+      base: 1,
+      entry: {
+        ...mixedAdd,
+        sigs: {
+          ...mixedAdd.sigs,
+          [mixedDid]: toB64(signBothEquations(mixed, signingBytes(mixedAdd))),
+        },
+      },
+      error: "roster-key",
+    },
+    {
+      name: "small-order-r",
+      base: 1,
+      entry: {
+        ...identityR,
+        sigs: { [did(A)]: toB64(signIdentityR(A.sigSeed, signingBytes(identityR))) },
+      },
+      error: "roster-signature",
     },
     {
       name: "readd-removed-device",
@@ -409,6 +444,7 @@ function replacements(entries: Chain) {
   const [, , e2, , , , , , e8] = entries;
   const R3 = memberSecrets(rand("R3 sig"), rand("R3 kem"));
   const E = memberSecrets(rand("E sig"), rand("E kem"));
+  const N = memberSecrets(rand("N sig"), rand("N kem"));
   const newKey = (label: string, n: number, members: MemberSecrets[]) =>
     epochDraft(rand(`replacement ${label}`), group, n, members);
   const removeC = (replace: boolean, cut = false) =>
@@ -461,6 +497,38 @@ function replacements(entries: Chain) {
     },
     [A, R2],
   );
+  const restoreN = entry(
+    e8,
+    {
+      op: "restore",
+      signer: did(R2),
+      add: [subject(N, "device")],
+      epoch: newKey("restore N", 5, [A, C, N, R2]),
+    },
+    [R2, N],
+  );
+  const replaceAfterRestore = entry(
+    restoreN,
+    {
+      op: "recovery",
+      signer: did(N),
+      remove: [did(R2)],
+      add: [subject(R3, "recovery")],
+      epoch: newKey("replace after restore", 6, [A, C, N, R3]),
+    },
+    [N, R3],
+  );
+  const removeOthers = entry(
+    replaceAfterRestore,
+    {
+      op: "remove",
+      signer: did(N),
+      remove: [did(A), did(C)].sort(),
+      cut: { [did(A)]: { seq: 1, hash: hex(rand("last object of A")) } },
+      epoch: newKey("remove others", 7, [N, R3]),
+    },
+    [N],
+  );
   const view = (...steps: Entry[]) => stateView(replayRoster([...entries, ...steps]));
   return [
     {
@@ -496,6 +564,11 @@ function replacements(entries: Chain) {
       state: view(addE, cLeaves, replaced),
     },
     { name: "replacement-not-called-for", base: 3, steps: [notDue], error: "roster-op" },
+    {
+      name: "restore-then-remove-the-other-devices",
+      steps: [restoreN, replaceAfterRestore, removeOthers],
+      state: view(restoreN, replaceAfterRestore, removeOthers),
+    },
   ];
 }
 

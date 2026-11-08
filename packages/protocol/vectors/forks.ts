@@ -134,6 +134,27 @@ function entries() {
     },
     [N, R2],
   );
+  const restoredKeepsNone = next(
+    restored,
+    {
+      op: "remove",
+      signer: did(N),
+      remove: [did(A), did(B), did(C)].sort(),
+      cut: { [did(A)]: { seq: 1, hash: hex(rand("last object of A")) } },
+      epoch: epochDraft(key("restored keeps none"), group, 3, [N, R2]),
+    },
+    [N],
+  );
+  const restoredKeepsA = next(
+    restored,
+    {
+      op: "remove",
+      signer: did(N),
+      remove: [did(B), did(C)].sort(),
+      epoch: epochDraft(key("restored keeps a"), group, 3, [A, N, R2]),
+    },
+    [N],
+  );
 
   const cSetsWords = next(
     addC,
@@ -228,6 +249,8 @@ function entries() {
     restorePad3,
     restore,
     restored,
+    restoredKeepsNone,
+    restoredKeepsA,
     aRotate,
     bRotate,
     cAdds,
@@ -287,6 +310,26 @@ const CASES: Case[] = [
     view: [...BASE, "restoreEarly", "restorePad1", "restorePad2", "restorePad3"],
   },
   { name: "restore-then-replace", view: [...BASE, "restore", "restored"] },
+  {
+    name: "restore-signs-out-a-device-whose-removal-it-never-read",
+    applied: [...BASE, "aRemovesC"],
+    view: ["restore", "restored", "restoredKeepsNone"],
+  },
+  {
+    name: "restore-signing-out-a-device-on-a-linear-store",
+    applied: [...BASE, "aRemovesC"],
+    view: ["restore", "restored", "restoredKeepsNone"],
+    linear: true,
+  },
+  {
+    name: "restore-keeping-the-device-that-removed-another",
+    applied: [...BASE, "aRemovesC"],
+    view: ["restore", "restored", "restoredKeepsA"],
+  },
+  {
+    name: "restore-signing-out-the-device-that-replaced-its-words",
+    view: [...BASE, "replaceWords", "restore", "restored", "restoredKeepsNone"],
+  },
   {
     name: "restore-against-the-removal-that-replaces-its-key",
     view: [...BASE, "cSetsWords", "restoreWithThem", "aRemovesCReplacing"],

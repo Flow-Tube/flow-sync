@@ -76,6 +76,12 @@ export function postgresPool(connectionString: string): pg.Pool {
 export function openPostgres(pool: pg.Pool): Storage {
   async function transaction<T>(lock: number, body: (query: Query) => Promise<T>): Promise<T> {
     const client = await pool.connect();
+    // The pool listens only while a client is idle, and an unheard `error` stops the process.
+    let lost: Error | undefined;
+    const onError = (error: Error) => {
+      lost = error;
+    };
+    client.on("error", onError);
     try {
       await client.query("BEGIN");
       await client.query("SELECT pg_advisory_xact_lock($1)", [lock]);
@@ -86,7 +92,8 @@ export function openPostgres(pool: pg.Pool): Storage {
       await client.query("ROLLBACK");
       throw error;
     } finally {
-      client.release();
+      client.off("error", onError);
+      client.release(lost);
     }
   }
 

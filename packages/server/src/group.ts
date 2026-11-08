@@ -1,5 +1,6 @@
 import {
   canonical,
+  checkAddedKeys,
   checkEntry,
   type Entry,
   fail,
@@ -102,7 +103,10 @@ export class Group {
         INSTANCE_SETTINGS.map((k) => this.#meta.getSetting(k)),
       );
       return { id: fromHex(id as string), secret: fromHex(secret as string) };
-    })();
+    })().catch((error) => {
+      this.#instance = undefined;
+      throw error;
+    });
     return this.#instance;
   }
 
@@ -139,6 +143,7 @@ export class Group {
     if (json.length > LIMITS.rosterEntry) throw new HttpError("too_large");
     const before = await this.roster();
     const { state: after, signatures } = checkEntry(before, entry);
+    checkAddedKeys(entry);
     await verified(signatures);
     const appended = await this.#meta.appendRoster({
       seq: entry.seq,

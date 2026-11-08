@@ -31,7 +31,8 @@ export function processLive(
         };
       }),
       changed: (did) => hub.changed(did),
-      sweep: () => hub.sweep(),
+      // Storage is down: the next tick tries again, and connections stay as they are until then.
+      sweep: () => hub.sweep().catch(() => {}),
     };
   };
 }
