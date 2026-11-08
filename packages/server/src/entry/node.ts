@@ -22,6 +22,12 @@ const server = listen(
   ({ port }) => console.log(JSON.stringify({ event: "listening", port })),
 );
 
+// A request's failure must not end the service. The class only: a message may hold input.
+process.on("unhandledRejection", (reason) => {
+  const cause = reason instanceof Error ? reason.name : typeof reason;
+  console.log(JSON.stringify({ event: "unhandled", cause }));
+});
+
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => server.close(() => process.exit(0)));
 }
