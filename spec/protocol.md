@@ -152,7 +152,7 @@ N pins the head from `welcome`. A store that later shows N a different history a
 
 ### Joining with the admin token
 
-On a Flow server, a new device can ask to join instead of scanning a code ([api.md](api.md)):
+On a Flow server, a new device can ask to join instead of scanning a code ([api.md](api.md)). A device keeps the admin token only in memory, for the request it was entered for, and never stores it.
 
 1. The new device posts a join request with the admin token: a random 16-byte `id` (hex) and its device name, at most 64 characters. A request lasts 180 seconds, and at most 3 are pending.
 2. Linked devices list pending requests while Linked devices is open and on each sync, and ask the user whether to accept the request, saying that the name isn't verified and to accept only if they started this on the other device.
