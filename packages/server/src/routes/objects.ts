@@ -86,7 +86,7 @@ export function objectRoutes(
   const { meta, blobs, group } = deps;
   const member = requireMember(deps);
   return new Hono<AppEnv>()
-    .put(`${PREFIX}*`, limitBody(LIMITS.object), member, async (c) => {
+    .put(`${PREFIX}*`, member, limitBody(LIMITS.object), async (c) => {
       const target = devicePath(c);
       if (target.did !== c.get("did")) throw new HttpError("forbidden");
       const bytes = await readBytes(c);
