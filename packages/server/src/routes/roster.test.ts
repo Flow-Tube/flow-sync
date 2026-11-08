@@ -1,9 +1,28 @@
-import { buildEntry, leaveDraft, memberSubject, replayRoster, toHex } from "@flow-sync/protocol";
+import {
+  buildEntry,
+  type EntryDraft,
+  epochDraft,
+  leaveDraft,
+  type MemberSecrets,
+  memberSubject,
+  randomBytes,
+  replayRoster,
+  sealChain,
+  toB64,
+  toHex,
+  wrapEpochKey,
+} from "@flow-sync/protocol";
 import { describe, expect, test } from "vitest";
 import { claimedApp } from "../testing/app.ts";
 import { newDevice, signIn } from "../testing/group.ts";
 import { bearer } from "../testing/http.ts";
 import { addDevice, append, entries, removal, rotation } from "../testing/roster.ts";
+
+interface Epoch {
+  wraps: Record<string, string>;
+  chain: string;
+  epoch: ReturnType<typeof epochDraft>;
+}
 
 describe("roster", () => {
   test("members read the roster from any point", async () => {
@@ -102,6 +121,74 @@ describe("roster", () => {
     expect(res.status).toBe(201);
     expect((await h.app.request("/v1/status", bearer(removedToken))).status).toBe(401);
     expect((await h.app.request("/v1/roster", bearer(removedToken))).status).toBe(401);
+  });
+
+  test("a restore can replace the words and then remove the other devices", async () => {
+    const h = await claimedApp();
+    const token = await signIn(h.app, h.device, h.group);
+    const lostDevice = toHex(h.device.did);
+    const restoring = newDevice();
+    const words = newDevice();
+    const start = async (n: number, members: MemberSecrets[], previous: Uint8Array) => {
+      const key = randomBytes(32);
+      const wraps: Record<string, string> = {};
+      for (const member of members) {
+        wraps[toHex(member.did)] = toB64(
+          await wrapEpochKey(member.kemPublic, h.group, n, member.did, key),
+        );
+      }
+      return {
+        key,
+        wraps,
+        chain: toB64(sealChain(key, h.group, n, previous)),
+        epoch: epochDraft(key, h.group, n, members),
+      };
+    };
+    const send = async (as: string, draft: EntryDraft, signers: MemberSecrets[], next: Epoch) => {
+      const state = replayRoster(await entries(h, as));
+      const entry = buildEntry(h.group, state, { ...draft, epoch: next.epoch }, signers);
+      const { wraps, chain } = next;
+      return append(h, as, { entry, wraps, chain }, state.head);
+    };
+
+    const first = await start(1, [h.device, h.recovery, restoring], h.epochKey);
+    const asWords = await signIn(h.app, h.recovery, h.group);
+    const restore = await send(
+      asWords,
+      {
+        op: "restore",
+        signer: toHex(h.recovery.did),
+        add: [memberSubject(restoring, "device")],
+      },
+      [h.recovery, restoring],
+      first,
+    );
+    expect(restore.status).toBe(201);
+
+    const asRestored = await signIn(h.app, restoring, h.group);
+    const second = await start(2, [h.device, restoring, words], first.key);
+    const replace = await send(
+      asRestored,
+      {
+        op: "recovery",
+        signer: toHex(restoring.did),
+        remove: [toHex(h.recovery.did)],
+        add: [memberSubject(words, "recovery")],
+      },
+      [restoring, words],
+      second,
+    );
+    expect(replace.status).toBe(201);
+
+    const third = await start(3, [restoring, words], second.key);
+    const remove = await send(
+      asRestored,
+      { op: "remove", signer: toHex(restoring.did), remove: [lostDevice] },
+      [restoring],
+      third,
+    );
+    expect(remove.status).toBe(201);
+    expect((await h.app.request("/v1/status", bearer(token))).status).toBe(401);
   });
 
   test("a device that leaves is revoked at once, and the next epoch excludes it", async () => {
