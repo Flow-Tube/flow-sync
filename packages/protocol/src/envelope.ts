@@ -5,13 +5,20 @@ import type { Purpose } from "./epoch.ts";
 import { fail } from "./errors.ts";
 import { sha256, tag } from "./kdf.ts";
 
-export const ObjectType = { changes: 0x01, snapshot: 0x02, ack: 0x03, live: 0x10 } as const;
+export const ObjectType = {
+  changes: 0x01,
+  snapshot: 0x02,
+  ack: 0x03,
+  login: 0x04,
+  live: 0x10,
+} as const;
 export type ObjectType = (typeof ObjectType)[keyof typeof ObjectType];
 
 const PURPOSE: Record<ObjectType, Purpose> = {
   [ObjectType.changes]: "changes",
   [ObjectType.snapshot]: "snapshot",
   [ObjectType.ack]: "ack",
+  [ObjectType.login]: "store",
   [ObjectType.live]: "live",
 };
 
@@ -125,6 +132,31 @@ export function nextInStream(
   if (seq > from.seq + 1) fail("gap");
   if (!equalBytes(prev, from.hash)) fail("prev");
   return { seq, hash: object.hash };
+}
+
+/**
+ * Walks a removed sender's log down from its cut to the reader's position, so nothing is applied
+ * from a chain that doesn't reach the hash the removal names. Returns the hash each object must
+ * have when it is then read forward.
+ */
+export function cutChain(
+  cut: { seq: number; hash: Uint8Array },
+  last: StreamPosition | undefined,
+  group: Uint8Array,
+  read: (seq: number) => Uint8Array | undefined,
+): Map<number, Uint8Array> {
+  const from = last ?? STREAM_START;
+  const hashes = new Map<number, Uint8Array>();
+  let wanted = cut.hash;
+  for (let seq = cut.seq; seq > from.seq; seq--) {
+    const bytes = read(seq);
+    if (!bytes) fail("gap");
+    if (!equalBytes(sha256(bytes), wanted)) fail("prev");
+    hashes.set(seq, wanted);
+    wanted = parseObject(bytes, group).header.prev;
+  }
+  if (cut.seq > from.seq && !equalBytes(wanted, from.hash)) fail("prev");
+  return hashes;
 }
 
 /** Live messages carry a counter instead of a chain. */

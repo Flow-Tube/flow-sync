@@ -1,6 +1,7 @@
 import {
   agreementPublicKey,
   canonical,
+  concat,
   encodePayload,
   lanFrameAad,
   lanHelloAad,
@@ -8,7 +9,9 @@ import {
   lanTag,
   lanTranscript,
   pairingAad,
+  pairingCommit,
   pairingKeys,
+  pairingProof,
   pairingSlot,
   purposeKey,
   seal,
@@ -31,12 +34,20 @@ export function pairingVectors(): Vectors {
     type: "join",
   });
   const salt = rand("pairing salt");
+  const proof = pairingProof(token, scannerPublic);
   return {
     showerSecret: hex(showerSecret),
     showerPublic: hex(showerPublic),
     scannerSecret: hex(scannerSecret),
     scannerPublic: hex(scannerPublic),
     token: hex(token),
+    commit: hex(pairingCommit(showerPublic)),
+    proof: hex(proof),
+    scannerFirst: hex(concat(scannerPublic, proof)),
+    refused: {
+      showerPublic: hex(agreementPublicKey(rand("another shower ephemeral"))),
+      proof: hex(pairingProof(rand("another pairing token", 16), scannerPublic)),
+    },
     showerKey: hex(keys.showerKey),
     scannerKey: hex(keys.scannerKey),
     sas: keys.sas,

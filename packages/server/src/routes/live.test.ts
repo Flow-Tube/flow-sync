@@ -26,6 +26,34 @@ async function setup() {
 }
 
 describe("live relay", () => {
+  test("the periodic check survives a storage failure, and connections stay open", async () => {
+    const h = await setup();
+    const a = await connect(h.port, h.tokenA);
+    await a.next();
+    const rosterAfter = h.storage.meta.rosterAfter;
+    h.storage.meta.rosterAfter = () => Promise.reject(new Error("storage down"));
+    await expect(h.relay?.sweep()).resolves.toBeUndefined();
+    h.storage.meta.rosterAfter = rosterAfter;
+    expect(a.socket.readyState).toBe(WebSocket.OPEN);
+  });
+
+  test("a message that can't be checked closes its sender and rejects nothing", async () => {
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => rejections.push(reason);
+    process.on("unhandledRejection", onRejection);
+    try {
+      const h = await setup();
+      const a = await connect(h.port, h.tokenA);
+      await a.next();
+      h.storage.meta.rosterAfter = () => Promise.reject(new Error("storage down"));
+      a.socket.send(h.live());
+      expect(await a.closed).toBe(1011);
+      expect(rejections).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", onRejection);
+    }
+  });
+
   test("messages reach the other devices, never the sender", async () => {
     const h = await setup();
     const a = await connect(h.port, h.tokenA);
@@ -90,6 +118,33 @@ describe("live relay", () => {
     const again = await connect(h.port, h.tokenA);
     again.socket.send(h.live(h.joining));
     expect(await again.closed).toBe(1008);
+  });
+
+  test("a message from an earlier epoch reaches no one and keeps its sender connected", async () => {
+    const h = await setup();
+    const { joining: leaving } = await addDevice(h, h.tokenA);
+    const { entry, wraps, chain, head, key } = await removal(h, h.tokenA, toHex(leaving.did), [
+      h.joining,
+    ]);
+    expect((await append(h, h.tokenA, { entry, wraps, chain }, head)).status).toBe(201);
+    const a = await connect(h.port, h.tokenA);
+    await a.next();
+    const b = await connect(h.port, h.tokenB);
+    await a.next();
+    await b.next();
+    const message = (counter: number, epoch: number) =>
+      sealedObject(h.device, counter, {
+        group: h.group,
+        epochKey: key,
+        epoch,
+        type: ObjectType.live,
+      });
+    a.socket.send(h.live());
+    const current = message(2, 1);
+    a.socket.send(current);
+    expect(await b.next()).toEqual(current);
+    a.socket.send(message(3, 2));
+    expect(await a.closed).toBe(1008);
   });
 
   test("a device holds at most two connections", async () => {

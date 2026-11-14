@@ -36,7 +36,7 @@ export class SimDevice {
   readonly keys: MemberSecrets;
   readonly #base: string;
   #token = "";
-  group = new Uint8Array();
+  group: Uint8Array = new Uint8Array();
   instance = "";
   state: RosterState | undefined;
   readonly #epochKeys = new Map<number, Uint8Array>();

@@ -1,4 +1,11 @@
-import { fromHex, ObjectType, objectSignature, parseObject, toHex } from "@flow-sync/protocol";
+import {
+  fromHex,
+  ObjectType,
+  objectSignature,
+  parseObject,
+  type RosterState,
+  toHex,
+} from "@flow-sync/protocol";
 import { verifySignature } from "../crypto.ts";
 import type { Group } from "../group.ts";
 import { RateLimiter } from "../limits/counters.ts";
@@ -6,6 +13,7 @@ import { LIMITS } from "../limits.ts";
 
 const POLICY_VIOLATION = 1008;
 const UNSUPPORTED_DATA = 1003;
+const INTERNAL_ERROR = 1011;
 const MAX_CONNECTIONS_PER_DEVICE = 2;
 
 export interface LiveSocket {
@@ -70,7 +78,12 @@ export class LiveHub {
     const from = this.#connections.get(socket);
     if (!from) return;
     if (typeof data === "string") return this.#close(from, UNSUPPORTED_DATA);
-    const state = await this.#group.claimed();
+    let state: RosterState;
+    try {
+      state = await this.#group.claimed();
+    } catch {
+      return this.#close(from, INTERNAL_ERROR);
+    }
     const member = state.members.get(from.did);
     const now = this.#now();
     if (
@@ -84,9 +97,11 @@ export class LiveHub {
     try {
       const object = parseObject(data, fromHex(state.group));
       const { header } = object;
-      const valid = header.type === ObjectType.live && header.epoch === state.epoch;
+      const valid = header.type === ObjectType.live && header.epoch <= state.epoch;
       if (!valid || toHex(header.sender) !== from.did) throw new Error("invalid live message");
       if (!(await verifySignature(objectSignature(object, member.sig)))) throw new Error("forged");
+      // Its sender hasn't seen the new epoch yet. Connected, it hears `changed` and syncs.
+      if (header.epoch < state.epoch) return;
     } catch {
       return this.#close(from, POLICY_VIOLATION);
     }

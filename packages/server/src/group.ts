@@ -1,5 +1,6 @@
 import {
   canonical,
+  checkAddedKeys,
   checkEntry,
   type Entry,
   fail,
@@ -11,6 +12,7 @@ import {
   randomBytes,
   type SignatureCheck,
   toHex,
+  utf8,
   WRAP_SIZE,
 } from "@flow-sync/protocol";
 import { verifyAll } from "./crypto.ts";
@@ -102,7 +104,10 @@ export class Group {
         INSTANCE_SETTINGS.map((k) => this.#meta.getSetting(k)),
       );
       return { id: fromHex(id as string), secret: fromHex(secret as string) };
-    })();
+    })().catch((error) => {
+      this.#instance = undefined;
+      throw error;
+    });
     return this.#instance;
   }
 
@@ -134,11 +139,13 @@ export class Group {
   }
 
   /** Validates an entry with its wraps and appends it, or fails with the current head. */
-  async append(entry: Entry, wraps: Record<string, string>, chain?: string): Promise<void> {
+  async append(value: unknown, wraps: Record<string, string>, chain?: string): Promise<void> {
+    if (utf8(JSON.stringify(value)).length > LIMITS.rosterEntry) throw new HttpError("too_large");
+    const entry = parseEntry(value);
     const json = canonical(entry as Json);
-    if (json.length > LIMITS.rosterEntry) throw new HttpError("too_large");
     const before = await this.roster();
     const { state: after, signatures } = checkEntry(before, entry);
+    checkAddedKeys(entry);
     await verified(signatures);
     const appended = await this.#meta.appendRoster({
       seq: entry.seq,

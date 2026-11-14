@@ -35,7 +35,7 @@ The first `play` or `cmd` from a device asks the user on the receiving device: a
 
 `GET /v1/live` upgrades to a WebSocket. The token travels as a subprotocol, `Sec-WebSocket-Protocol: flow-sync.v1, bearer.<token>`, and the server answers `flow-sync.v1`.
 
-- Binary frames are envelopes. The server checks the length (at most 64 KiB), the group, that the sender is the token's device, and the signature. It then forwards the frame to the group's other connections and keeps nothing.
+- Binary frames are envelopes. The server checks the length (at most 64 KiB), the group, that the sender is the token's device, and the signature. It then forwards the frame to the group's other connections and keeps nothing. A frame from an epoch before the current one isn't forwarded, and its sender stays connected: it hasn't seen the entry that started the current epoch, and `changed` makes it sync. A frame from a later epoch, or one that fails a check, closes the connection.
 - Text frames come only from the server: `{"type":"peers","online":["<did>", …]}` whenever the set of connected devices changes, and `{"type":"changed"}` to every other device of the group when one stores a log object, blob or roster entry. A device that has the app open syncs soon after `changed`, so changes reach it without polling.
 - Clients ping every 15 seconds. The server checks its connections at least every 15 seconds and closes any whose token has expired or whose device was removed. Clients reconnect with a fresh token.
 - Per device: at most 20 messages per second and 2 connections.
@@ -81,6 +81,8 @@ K_sc = Derive(P_e,lan, n_C ‖ n_S, "lan s2c", C ‖ S, 32)
 
 Later frames are `u64(seq) ‖ Box(K, "FLOW-SYNC/2 lan" ‖ u64(seq), payload)`, with `seq` counting from 0 in each direction and checked strictly.
 
+S answers a hello under any epoch it holds a key for, up to its own. C sends its first hello under its current epoch. When S closes the connection without answering message 2, C dials again one epoch lower, for at most 4 attempts in all. So members on two sides of a fork still meet: below the fork they hold the same key. They pull what the other holds, settle, and the next session runs at the epoch they share. C doesn't retry when it can't connect at all, or when message 2 fails a check. While they are on two sides of a fork their [discovery tags](#discovery) differ, so they meet through remembered addresses. A session at an older epoch is under that epoch's `P_e,lan`; the objects and live messages it carries keep their own sealing.
+
 ### Requests
 
 Every box on the LAN holds a [payload](crypto.md#payload-encoding), as everywhere else. Hello bodies are `{"did":"<hex>","n":"<b64>","p":<port>}`, `{"did","n","sig"}` and `{"sig"}`, where `p` is the port C listens on.
@@ -92,8 +94,8 @@ After message 3, either device may send requests at any time, and answers may co
 
 | `op` | Request fields | Response fields | Bytes |
 |---|---|---|---|
-| `roster` | `after` (the `seq` of the asker's head, or -1) and `head` (its hash, absent with -1) | `entries`: every roster entry the peer holds with a `seq` above `after`, fork candidates included; every entry it holds when `head` is not on its own winning chain (it holds no entry with that hash, or that entry lost a fork) | none |
-| `key` | `epoch`, `name` (a member's `did` or `chain`) | none | the wrap or the chain box |
+| `roster` | `after` (a `seq`, or -1 for every entry) | `entries`: every roster entry the peer holds with a `seq` above `after`, fork candidates included | none |
+| `key` | `epoch`, `kc` (the `<kc:16>` of the [store path](store.md#layout)), `name` (a member's `did` or `chain`) | none | the wrap or the chain box |
 | `list` | `vv`: `{did: seq}`, for each log the last `seq` the asker holds with none missing between it and the oldest object it holds of that log | `paths`: the log objects the peer holds above `vv`; `blobs`: every blob path the peer holds | none |
 | `get` | `path` | none | the object or blob |
 | `put` | `path` | none | in the request: the object |
@@ -107,12 +109,12 @@ A group can live on its devices alone, with no store: its location is `{"k":"lan
 
 - **Creating.** A device writes the genesis entry and its wraps locally. Nothing is claimed.
 - **Holding.** Every device keeps every roster entry it has seen (fork candidates under their [store names](store.md#layout)), every wrap and chain box, and every log object and blob it has fetched, and serves them with the requests above.
-- **Appending.** A device writes the wraps and then the entry locally; the entry spreads as other devices pull `roster`. Concurrent entries resolve by the [fork rule](protocol.md#forks): a peer whose winning chain doesn't contain the asker's head answers `roster` with everything, so both see every candidate even when they pull at the same moment.
+- **Appending.** A device writes the wraps and then the entry locally; the entry spreads as other devices pull `roster`. Concurrent entries settle by the [fork rule](protocol.md#forks): a member always pulls every entry a peer holds, so both see every candidate even when they pull at the same moment.
 - **Pairing.** Pairing always runs over the LAN. The member's `welcome` carries `{"k":"lan"}`, and also `entries` (every roster entry up to the head it names) and `wrap` (b64, the new device's wrap of the current epoch): the new device needs both before it can verify the roster or open a LAN session, which starts with `P_e,lan`. After `done`, the member waits up to 5 seconds for the scanner to close the pairing connection, then the devices sync as below.
 - **Leaving.** A device that appends a `leave` entry meets every member it can reach, for up to 10 seconds, so they pull the entry before it forgets the group. A member it couldn't reach stays listed until another device removes it.
-- **Syncing.** When two members meet, through mDNS or a remembered address, each one pulls from the other: `roster` after its head, the wraps and chain boxes it lacks, then `list` with its version vector and `get` for what it lacks. It merges what it read as from any store, and writes its own objects locally only.
+- **Syncing.** When two members meet, through mDNS or a remembered address, each one pulls from the other: `roster` with `after` -1, since an entry that lost can sit below its head, the wraps and chain boxes it lacks for its settled chain and for the entries that lost and [stand](protocol.md#forks), then `list` with its version vector and `get` for what it lacks. It merges what it read as from any store, and writes its own objects locally only.
 
-Groups on a store sync the same way when their devices meet, as well as through the store.
+Groups on a store sync the same way when their devices meet, as well as through the store. For the roster, the store's answer decides while it answers ([protocol.md](protocol.md#what-a-device-does-with-a-stores-answer)).
 
 ### Platform notes
 

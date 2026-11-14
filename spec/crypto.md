@@ -21,7 +21,7 @@ The object envelope's suite byte names the algorithms. FLOW-SYNC/2 defines suite
 
 | | Android | Desktop | Reference and server |
 |---|---|---|---|
-| Ed25519, X25519 | BouncyCastle `bcprov-jdk18on` (`Ed25519`, `X25519`); Conscrypt's API can't derive a public key from a seed, which recovery keys need | `ed25519-dalek`, `x25519-dalek` | `@noble/curves` |
+| Ed25519, X25519 | BouncyCastle `bcprov-jdk18on` (`Ed25519`, `X25519`); Conscrypt's API can't derive a public key from a seed, which recovery keys need | `ed25519-dalek`, `x25519-dalek` | `@noble/curves`; the server verifies signatures with WebCrypto, behind the [checks below](#ed25519-checks) |
 | HPKE | Conscrypt 2.6.1, already bundled in Flow (`Conscrypt.newProvider()`, `HpkeContextSender`/`HpkeContextRecipient`) | `hpke` | `@hpke/core` |
 | HKDF, HMAC, SHA-256 | JCE `HmacSHA256`, `SHA-256` | `hkdf`, `hmac`, `sha2` | `@noble/hashes` |
 | AES-256-GCM | JCE `AES/GCM/NoPadding` | `aes-gcm` | `@noble/ciphers` |
@@ -30,11 +30,15 @@ The server only verifies Ed25519 signatures and computes hashes. It never unwrap
 
 ## Ed25519 checks
 
-Verification MUST use the cofactorless equation `[S]B = R + [k]A` and MUST reject:
+Verification checks `[S]B = R + [k]A` and MUST reject:
 
 - `S ≥ L` (the group order);
-- a non-canonical encoding of `A` or `R` (a y-coordinate ≥ 2<sup>255</sup> − 19);
-- a public key `A` whose encoding is one of the eight canonical encodings of a small-order point (listed in `vectors/ed25519.json`).
+- a non-canonical encoding of `A` or `R` (a y-coordinate ≥ 2<sup>255</sup> − 19, or x = 0 with the sign bit set);
+- an `A` or an `R` that is not a point of order exactly `L`. That covers the eight small-order points (listed in `vectors/ed25519.json`) and any point with a small-order part.
+
+With `A` and `R` both of order `L`, the cofactorless equation and the cofactored one (`[8][S]B = [8]R + [8][k]A`) give the same answer, so an implementation can keep the equation its library uses.
+
+An implementation that uses the cofactorless equation MAY check `A`'s order once, when the key enters the roster ([protocol.md](protocol.md)), instead of at every signature. For such an `A` the equation can only hold for an `R` of order `L` or for the identity, so it then needs only to refuse the eight small-order encodings of `R`. A test of `vectors/ed25519.json` applies the check on the key first.
 
 Honest signers never produce these cases, so the rules only matter for hostile input. Without them, two implementations could disagree about one signature, and devices could disagree about the roster.
 
@@ -61,6 +65,14 @@ Hash(label, data) = SHA-256("FLOW-SYNC/2 " ‖ label ‖ 0x00 ‖ data)
 
 ## Keys
 
+### Group id
+
+```
+group = Hash("group", device sig_pub ‖ device kem_pub ‖ recovery sig_pub ‖ recovery kem_pub)[0..16]
+```
+
+The keys are those of the `device` and `recovery` subjects of the genesis entry, by role. Both are fresh for each group, so ids don't repeat. A genesis that doesn't match its `group` is invalid, so nobody without those keys can write one for the group.
+
 ### Device keys
 
 Device keys belong to one membership of one group. A device generates fresh ones when it creates a group, joins one (by pairing, including with the admin token) and restores one with the recovery key:
@@ -70,7 +82,7 @@ Device keys belong to one membership of one group. A device generates fresh ones
 
 Its device id is `did = Hash("device", sig_pub ‖ kem_pub)[0..16]`.
 
-A device deletes its device keys, with the group's epoch keys, after it [leaves](protocol.md#leaving) or learns it was [removed](protocol.md#removal). A device that joins again therefore has a new `did`, which the roster accepts because it has never seen it, and starts a new log.
+A device deletes its device keys, with the group's epoch keys, after it [leaves](protocol.md#leaving), or when it is [removed](protocol.md#removal) under the conditions given there. A device that joins again therefore has a new `did`, which the roster accepts because it has never seen it, and starts a new log.
 
 Private keys never leave the device. They are stored encrypted by a platform key: on Android with the existing Keystore AES-GCM helper, on Desktop in the OS keychain.
 
@@ -87,6 +99,7 @@ P_e,x  = Derive(K_e, group, "key " ‖ x, u32(e), 32)       purpose key
 |---|---|
 | `roster` | Device names and platforms in roster entries |
 | `changes` | Change batches |
+| `store` | [Store logins](store.md#store-logins) |
 | `snapshot` | Snapshot manifests and their blobs |
 | `ack` | Acknowledgements |
 | `live` | Live channel messages |
@@ -153,7 +166,15 @@ Pad(n) = (n + mask) & ~mask
 
 PADMÉ ([Nikitin et al., PoPETs 2019](https://petsymposium.org/popets/2019/popets-2019-0056.php)) leaks O(log log n) bits of length with at most 12 % overhead.
 
-Decoders MUST reject a payload whose length field exceeds the payload, whose padding isn't all zeros, or whose gzip stream inflates beyond 64 MiB.
+`body` is exactly one gzip member and encoders MUST write `FLG` 0. Decoders MUST reject a payload:
+
+- whose length field exceeds the payload, or whose padding isn't all zeros;
+- whose body doesn't start with the bytes `1f 8b 08 00` (`ID1`, `ID2`, `CM` 8, `FLG` 0). `MTIME`, `XFL` and `OS`, the rest of the 10-byte header, aren't checked;
+- whose deflate stream doesn't end exactly where the 8-byte trailer starts, so that a second member, or any other byte, after the stream is refused;
+- whose trailer doesn't hold the content's CRC-32 and its length (`ISIZE`), both little-endian;
+- whose gzip stream inflates beyond 64 MiB.
+
+Libraries read gzip framing differently: some read through further members, some stop at the first, and some skip the trailer. Without these rules, devices could apply different data from one signed object.
 
 Compressing before encrypting leaks information only when an attacker can put chosen text next to a secret in the same compressed stream and watch the sizes many times. Each payload is compressed alone, padding hides fine-grained sizes, and no attacker-controlled input is mixed with secrets in one payload.
 
@@ -162,13 +183,15 @@ Compressing before encrypting leaks information only when an attacker can put ch
 Pairing uses an ephemeral X25519 key per side and the QR code's 16-byte token `t` ([protocol.md](protocol.md)). With `A` the device showing the code and `B` the scanner:
 
 ```
+c      = Hash("pair commit", e_A_pub)                       in the code, instead of e_A_pub
+proof  = Derive(t, "", "pair proof", e_B_pub, 16)           with the scanner's key
 z      = X25519(e_A, e_B)                                   reject all zeros
 K_ab   = Derive(z, t, "pair a2b", e_A_pub ‖ e_B_pub, 32)
 K_ba   = Derive(z, t, "pair b2a", e_A_pub ‖ e_B_pub, 32)
 SAS    = Derive(z, t, "sas", e_A_pub ‖ e_B_pub, 4)  as a big-endian integer, top bit cleared, mod 1 000 000
 ```
 
-The SAS is shown as six digits with leading zeros. Messages from A to B are boxes under `K_ab` and from B to A under `K_ba`, with `aad = "FLOW-SYNC/2 pair" ‖ t ‖ u64(seq)`. Because both keys depend on `t`, only someone who read the QR code can produce a box the other side accepts.
+The SAS is shown as six digits with leading zeros. `proof` is compared in constant time. The commitment stops either side from choosing its key after seeing the other's, which is what makes the digits a real check: see [Channel](protocol.md#channel). Messages from A to B are boxes under `K_ab` and from B to A under `K_ba`, with `aad = "FLOW-SYNC/2 pair" ‖ t ‖ u64(seq)`. Because both keys depend on `t`, only someone who read the QR code can produce a box the other side accepts. In the [admin-token join](protocol.md#joining-with-the-admin-token) the server reads the code too, so there only the digits decide.
 
 ## Recovery key
 
@@ -189,4 +212,4 @@ The QR code holds the same 24 words separated by single spaces. Devices refuse a
 | Bulk encryption | AES-256-GCM with a derived key per box and a commitment | **Plain AES-GCM with random nonces**: a 2<sup>32</sup> cap per key that devices can't coordinate. **XChaCha20-Poly1305**: no RFC (the draft expired in 2020) and no Android API. **AES-GCM-SIV**: Android API 30+ only, and the Rust crate has never been audited. |
 | HPKE AEAD | AES-256-GCM | ChaCha20-Poly1305 needs Android API 28. |
 | Android library | Conscrypt 2.6.1, already in the APK, for HPKE; BouncyCastle for Ed25519 and X25519. With the BIP39 word list they add 14.7 KB to the FOSS APK after R8. | **Conscrypt alone**: its public API can't derive an Ed25519 public key from a seed, which recovery keys need. Tink, libsodium and a newer standalone Conscrypt cost 0.5 to 5 MB. |
-| Signature verification on the server | `@noble/curves`, strict mode | WebCrypto Ed25519 differs between runtimes in edge cases. |
+| Signature verification on the server | WebCrypto, which is native on Node and Workers, with a key's order checked once when it enters the roster | **`@noble/curves` for every signature**: about 1 ms each, too much for the Workers Free CPU limit. WebCrypto alone isn't enough: Node and workerd differ on an identity `R`, and neither checks `A`'s order. |

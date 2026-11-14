@@ -4,7 +4,7 @@ import { randomBytes, toHex, utf8 } from "./bytes.ts";
 import { canonical, type Json } from "./canonical.ts";
 import { buildEntry, epochDraft, memberSubject } from "./entries.ts";
 import { FlowSyncError } from "./errors.ts";
-import { memberSecrets } from "./keys.ts";
+import { groupId, memberSecrets } from "./keys.ts";
 import { applyEntry, type Entry, entryHash, parseEntry } from "./roster.ts";
 import { fuzzRuns, mutations, refused } from "./testing/fuzz.ts";
 
@@ -34,9 +34,9 @@ test("arbitrary JSON is rejected as a roster entry with a protocol error", () =>
   );
 });
 
-const group = randomBytes(16);
 const member = () => memberSecrets(randomBytes(32), randomBytes(32));
 const [device, recovery, joiner] = [member(), member(), member()];
+const group = groupId(device, recovery);
 const genesis = buildEntry(
   group,
   undefined,
@@ -99,4 +99,19 @@ test("any changed, removed or added field of a signed entry is refused", async (
     fc.asyncProperty(edit, (changed) => applyText(JSON.stringify(changed))),
     fuzzRuns(),
   );
+});
+
+test("a meta value with a lone surrogate is refused, since it has no one UTF-8 form", () => {
+  const entry = {
+    v: 2,
+    group: "00".repeat(16),
+    seq: 1,
+    prev: "00".repeat(32),
+    op: "rename",
+    signer: "00".repeat(16),
+    meta: { ["00".repeat(16)]: "\ud800" },
+    sigs: {},
+  };
+  expect(() => parseEntry(entry)).toThrow(FlowSyncError);
+  expect(() => parseEntry({ ...entry, meta: { ["00".repeat(16)]: "AAAA" } })).not.toThrow();
 });

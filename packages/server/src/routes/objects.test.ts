@@ -14,7 +14,7 @@ import { claimedApp } from "../testing/app.ts";
 import { signIn } from "../testing/group.ts";
 import { bearer } from "../testing/http.ts";
 import { objectUrl, putBytes, sealedObject } from "../testing/objects.ts";
-import { addDevice, append, removal } from "../testing/roster.ts";
+import { addDevice, append, removal, rotation } from "../testing/roster.ts";
 
 type Harness = Awaited<ReturnType<typeof claimedApp>>;
 
@@ -113,6 +113,20 @@ describe("objects", () => {
     expect(await put(4)).toBe(400);
     expect(await put(4, { epoch: 2 })).toBe(400);
     expect(await put(4, current)).toBe(201);
+  });
+
+  test("a device can't write under an epoch from before it joined", async () => {
+    const h = await setup();
+    const { entry, wraps, chain, head, key } = await rotation(h, h.token);
+    expect((await append(h, h.token, { entry, wraps, chain }, head)).status).toBe(201);
+    const { joining } = await addDevice(h, h.token);
+    const token = await signIn(h.app, joining, h.group);
+    const put = async (seq: number, options: { epochKey: Uint8Array; epoch: number }) => {
+      const bytes = sealedObject(joining, seq, { group: h.group, ...options });
+      return (await h.app.request(objectUrl(joining, seq), putBytes(token, bytes))).status;
+    };
+    expect(await put(1, { epochKey: h.epochKey, epoch: 0 })).toBe(400);
+    expect(await put(1, { epochKey: key, epoch: 1 })).toBe(201);
   });
 
   test("snapshot blobs are stored under their hash", async () => {

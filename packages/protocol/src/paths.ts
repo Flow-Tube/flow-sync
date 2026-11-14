@@ -1,15 +1,20 @@
+import { toHex } from "./bytes.ts";
+
 const pad = (value: number | bigint, digits: number) => value.toString(16).padStart(digits, "0");
 
 export function rosterPath(seq: number, hash: string): string {
   return `roster/${pad(seq, 16)}-${hash.slice(0, 16)}.r`;
 }
 
-export function wrapPath(epoch: number, did: string): string {
-  return `keys/${pad(epoch, 8)}/${did}.k`;
+const keyFolder = (epoch: number, kc: Uint8Array) =>
+  `keys/${pad(epoch, 8)}/${toHex(kc.subarray(0, 8))}`;
+
+export function wrapPath(epoch: number, kc: Uint8Array, did: string): string {
+  return `${keyFolder(epoch, kc)}/${did}.k`;
 }
 
-export function chainPath(epoch: number): string {
-  return `keys/${pad(epoch, 8)}/chain.k`;
+export function chainPath(epoch: number, kc: Uint8Array): string {
+  return `${keyFolder(epoch, kc)}/chain.k`;
 }
 
 export function logPath(did: string, seq: number): string {

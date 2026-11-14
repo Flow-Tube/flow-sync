@@ -49,6 +49,7 @@ describe("claim", () => {
       { entry, wraps: missing },
       { entry, wraps: { ...wraps, [first as string]: "AAAA" } },
       { entry: { ...entry, seq: 1 }, wraps },
+      { entry: { ...entry, group: "00".repeat(16) }, wraps },
       { entry: { ...entry, sigs: {} }, wraps },
       { entry: "not an entry", wraps },
     ];

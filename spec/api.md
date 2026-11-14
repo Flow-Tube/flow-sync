@@ -67,8 +67,8 @@ The operator sets `FLOW_SYNC_ADMIN_TOKEN`, or `FLOW_SYNC_ADMIN_TOKEN_FILE` namin
 | `DELETE /v1/objects/<path>` | token | | 204 |
 | `GET /v1/changes?after=<cursor>&limit=<n>` | token | | `{"objects":[{"path":…,"size":n}],"cursor":"<opaque>"}`, in arrival order |
 | `POST /v1/pair` | token | `{"slot":"<hex>"}` | 201 `{"expires":<ms>}` |
-| `PUT /v1/pair/<slot>/<name>` | slot | box bytes | 201 |
-| `GET /v1/pair/<slot>/<name>` | slot | | box bytes, or 404 |
+| `PUT /v1/pair/<slot>/<name>` | slot | message bytes | 201 |
+| `GET /v1/pair/<slot>/<name>` | slot | | message bytes, or 404 |
 | `DELETE /v1/pair/<slot>` | token | | 204 |
 | `POST /v1/join` | admin | `{"id":"<hex>","name":"…"}` | 201 `{"expires":<ms>}`, or 409 when the id exists or 3 requests are pending |
 | `GET /v1/join` | token | | `{"requests":[{"id","name","expires"}]}`: pending requests not answered or declined yet |
@@ -89,7 +89,7 @@ The server validates an append with the reference roster rules ([protocol.md](pr
 
 `<path>` is a store path ([store.md](store.md#layout)) under `dev/`. Roster entries, wraps and pairing messages have their own endpoints.
 
-- **Writes.** A device writes only under `dev/<its did>/`. The server checks that the body is a well-formed envelope or blob: length, magic, suite, group, sender equal to the caller, `seq` equal to the path, an epoch no later than the current one, a valid signature, and for blobs a SHA-256 equal to the name. An envelope from an earlier epoch is one the device sealed before it saw the entry that started the current epoch, for example while offline; refusing it would stop its log for good. Its epoch must not be earlier than that of the sender's object at `seq` − 1, when the server holds it, so a device never goes back to an older key.
+- **Writes.** A device writes only under `dev/<its did>/`. The server checks that the body is a well-formed envelope or blob: length, magic, suite, group, sender equal to the caller, `seq` equal to the path, an epoch no later than the current one, a valid signature, and for blobs a SHA-256 equal to the name. An envelope from an earlier epoch is one the device sealed before it saw the entry that started the current epoch, for example while offline; refusing it would stop its log for good. Its epoch must not be earlier than that of the sender's object at `seq` − 1, when the server holds it, so a device never goes back to an older key, nor earlier than the epoch in force when the sender was added.
 - **Deletes.** A device deletes its own paths, and any path of a removed device.
 - **Reads.** Objects are served as `application/octet-stream` with `Content-Disposition: attachment; filename="flow-sync.bin"`, only to current devices. The server never parses, transforms or executes stored content.
 
@@ -97,7 +97,7 @@ Garbage collection is client-driven, as on every backend ([protocol.md](protocol
 
 ### Pairing mailbox
 
-A member opens a slot with `slot = Hash("pair", t)[0..16]`. Knowing the slot id is the capability: the new device has no token yet, and only someone who read the QR code knows `t`. A slot holds at most 8 messages of at most 8 KiB in each direction, expires after 180 seconds, and an instance holds at most 3 open slots. Devices poll the mailbox no more than once every 2 seconds, which keeps a device without a token inside the per-address request limit.
+A member opens a slot with `slot = Hash("pair", t)[0..16]`. Knowing the slot id is the capability: the new device has no token yet, and only someone who read the QR code knows `t`. A slot holds at most 8 messages of 32 bytes to 8 KiB in each direction, expires after 180 seconds, and an instance holds at most 3 open slots. Devices poll the mailbox no more than once every 2 seconds, which keeps a device without a token inside the per-address request limit.
 
 ## Limits
 
@@ -105,7 +105,7 @@ A member opens a slot with `slot = Hash("pair", t)[0..16]`. Knowing the slot id 
 |---|---|
 | JSON request body | 64 KiB |
 | Object or blob | 4 MiB |
-| Roster entry | 16 KiB |
+| Roster entry | 16 KiB of UTF-8 |
 | Roster page | 500 entries |
 | Cursor page | 1,000 objects |
 | Body read timeout | 30 s |

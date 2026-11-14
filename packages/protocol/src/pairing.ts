@@ -10,6 +10,16 @@ export interface PairingKeys {
   sas: string;
 }
 
+/** What a code carries instead of the shower's key, so that key is fixed before the scanner's is seen. */
+export function pairingCommit(showerPublic: Uint8Array): Uint8Array {
+  return labeledHash("pair commit", showerPublic);
+}
+
+/** Shows the shower that the scanner read the code, before the shower reveals its key. */
+export function pairingProof(token: Uint8Array, scannerPublic: Uint8Array): Uint8Array {
+  return derive(token, new Uint8Array(), "pair proof", scannerPublic, 16);
+}
+
 export function pairingKeys(
   ownSecret: Uint8Array,
   peerPublic: Uint8Array,

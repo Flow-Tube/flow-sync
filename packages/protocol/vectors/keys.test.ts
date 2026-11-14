@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   agreementPublicKey,
+  chainPath,
   checkEpochKey,
   decodePayload,
   epochCommitment,
@@ -12,7 +13,9 @@ import {
   memberSecrets,
   open,
   openChain,
+  pairingCommit,
   pairingKeys,
+  pairingProof,
   pairingSlot,
   purposeKey,
   recoveryKeys,
@@ -22,6 +25,7 @@ import {
   unwrapEpochKey,
   utf8,
   wrapEpochKey,
+  wrapPath,
 } from "../src/index.ts";
 import { bytes, expectCode, load } from "./load.ts";
 
@@ -43,6 +47,11 @@ describe("keys", () => {
     for (const [purpose, value] of Object.entries(purposes)) {
       expect(toHex(purposeKey(bytes(key), bytes(group), epoch, purpose as "roster"))).toBe(value);
     }
+  });
+  test("wrap and chain paths", () => {
+    const { epoch, commitment, did, wrap, chain } = v.paths;
+    expect(wrapPath(epoch, bytes(commitment), did)).toBe(wrap);
+    expect(chainPath(epoch, bytes(commitment))).toBe(chain);
   });
   test("wrap and unwrap", async () => {
     const w = v.wrap;
@@ -112,6 +121,11 @@ test("pairing", () => {
   ]);
   expect(toHex(agreementPublicKey(bytes(v.showerSecret)))).toBe(v.showerPublic);
   expect(toHex(pairingSlot(token))).toBe(v.slot);
+  expect(toHex(pairingCommit(bytes(v.showerPublic)))).toBe(v.commit);
+  expect(toHex(pairingProof(token, bytes(v.scannerPublic)))).toBe(v.proof);
+  expect(v.scannerFirst).toBe(v.scannerPublic + v.proof);
+  expect(toHex(pairingCommit(bytes(v.refused.showerPublic)))).not.toBe(v.commit);
+  expect(v.refused.proof).not.toBe(v.proof);
   const m = v.message;
   const content = decodePayload(open(shower.scannerKey, bytes(m.aad), bytes(m.box)));
   expect(content).toEqual(utf8(m.content));

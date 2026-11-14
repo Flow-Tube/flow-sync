@@ -1,5 +1,6 @@
 import {
   BOX_OVERHEAD,
+  checkSender,
   type DevicePath,
   fromHex,
   logPath,
@@ -70,6 +71,7 @@ async function checkObject(
   if (!valid) throw new HttpError("invalid");
   const sender = state.members.get(target.did);
   if (!sender) throw new HttpError("forbidden");
+  checkSender(state, target.did, header.epoch, header.seq);
   if (!(await verifySignature(objectSignature(object, sender.sig)))) throw new HttpError("invalid");
   // Sealed before the sender saw the new epoch (spec/api.md, Objects); a device never goes back.
   if (header.epoch < state.epoch && header.epoch < (await previousEpoch(stores, state, target))) {
@@ -84,7 +86,7 @@ export function objectRoutes(
   const { meta, blobs, group } = deps;
   const member = requireMember(deps);
   return new Hono<AppEnv>()
-    .put(`${PREFIX}*`, limitBody(LIMITS.object), member, async (c) => {
+    .put(`${PREFIX}*`, member, limitBody(LIMITS.object), async (c) => {
       const target = devicePath(c);
       if (target.did !== c.get("did")) throw new HttpError("forbidden");
       const bytes = await readBytes(c);

@@ -18,8 +18,10 @@ import {
   type Subject,
   sealDeviceMeta,
   signEntry,
+  signingBytes,
   toB64,
 } from "../src/index.ts";
+import { mixedOrderKey, signBothEquations, signIdentityR } from "./ed25519.ts";
 import { device, epochKeys, group, hex, rand, recovery, type Vectors } from "./fixtures.ts";
 
 const { A, B, C } = device;
@@ -83,7 +85,13 @@ function chain(): Chain {
   );
   const e3 = entry(
     e2,
-    { op: "remove", signer: did(A), remove: [did(B)], epoch: epoch(1, [A, R1]) },
+    {
+      op: "remove",
+      signer: did(A),
+      remove: [did(B)],
+      cut: { [did(B)]: { seq: 2, hash: hex(rand("last object of B")) } },
+      epoch: epoch(1, [A, R1]),
+    },
     [A],
   );
   const e4 = entry(
@@ -118,7 +126,7 @@ function chain(): Chain {
     },
     [C, D],
   );
-  const e7 = entry(e6, leaveDraft(D), [D]);
+  const e7 = entry(e6, leaveDraft(D, { seq: 1, hash: hex(rand("last object of D")) }), [D]);
   const e8 = entry(e7, rotate(A, 4, [A, C, R2]), [A]);
   return [e0, e1, e2, e3, e4, e5, e6, e7, e8];
 }
@@ -129,9 +137,24 @@ function stateView(state: RosterState) {
     head: state.head,
     epoch: state.epoch,
     rotate: state.rotate,
+    recoveryDue: state.recoveryDue,
     members: [...state.members.entries()]
       .sort(([a], [b]) => (a < b ? -1 : 1))
-      .map(([id, m]) => ({ did: id, role: m.role, used: m.used })),
+      .map(([id, m]) => ({
+        did: id,
+        role: m.role,
+        used: m.used,
+        ...(m.installer && { installer: m.installer }),
+      })),
+    senders: [...state.senders.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([id, s]) => ({
+        did: id,
+        role: s.role,
+        since: s.since,
+        ...(s.until !== undefined && { until: s.until }),
+        ...(s.cut && { cut: s.cut }),
+      })),
   };
 }
 
@@ -144,6 +167,27 @@ function negatives(entries: Chain) {
     kem: toB64(C.kemPublic),
     role: "device",
   };
+  const metaRename = (value: string) =>
+    entry(e0, { op: "rename", signer: did(A), meta: { [did(A)]: value } }, [A]);
+  const refusedMeta = (name: string, value: string) => ({
+    name,
+    base: 1,
+    entry: metaRename(value),
+    error: "roster-format",
+  });
+  const mixed = mixedOrderKey(rand("mixed sig"));
+  const mixedDid = hex(memberId(mixed.key, C.kemPublic));
+  const mixedAdd = entry(
+    e0,
+    {
+      op: "add",
+      signer: did(A),
+      add: [{ did: mixedDid, sig: toB64(mixed.key), kem: toB64(C.kemPublic), role: "device" }],
+    },
+    [A],
+  );
+  const identityR = entry(e0, { op: "rename", signer: did(A), meta: { [did(A)]: "AA" } }, []);
+  const oneObject = { seq: 1, hash: hex(rand("an object")) };
   const wrongSeq = signEntry(
     { ...entry(e0, { op: "rename", signer: did(A), meta: e0.meta ?? {} }, []), seq: 5 },
     did(A),
@@ -163,6 +207,58 @@ function negatives(entries: Chain) {
       error: "roster-signature",
     },
     { name: "unknown-field", base: 1, entry: { ...e1, extra: 1 }, error: "roster-format" },
+    {
+      name: "cut-on-the-wrong-op",
+      base: 2,
+      entry: entry(
+        e1,
+        { op: "rotate", signer: did(A), epoch: epoch(1, [A, B, R1]), cut: { [did(B)]: oneObject } },
+        [A],
+      ),
+      error: "roster-op",
+    },
+    {
+      name: "cut-for-a-device-not-removed",
+      base: 3,
+      entry: entry(
+        e2,
+        {
+          op: "remove",
+          signer: did(A),
+          remove: [did(B)],
+          cut: { [did(A)]: oneObject },
+          epoch: epoch(1, [A, R1]),
+        },
+        [A],
+      ),
+      error: "roster-op",
+    },
+    {
+      name: "cut-empty",
+      base: 3,
+      entry: entry(
+        e2,
+        { op: "remove", signer: did(A), remove: [did(B)], cut: {}, epoch: epoch(1, [A, R1]) },
+        [A],
+      ),
+      error: "roster-format",
+    },
+    {
+      name: "cut-at-seq-zero",
+      base: 3,
+      entry: entry(
+        e2,
+        {
+          op: "remove",
+          signer: did(A),
+          remove: [did(B)],
+          cut: { [did(B)]: { ...oneObject, seq: 0 } },
+          epoch: epoch(1, [A, R1]),
+        },
+        [A],
+      ),
+      error: "roster-format",
+    },
     { name: "wrong-seq", base: 1, entry: wrongSeq, error: "roster-chain" },
     { name: "truncated-chain", base: 2, entry: e3, error: "roster-chain" },
     {
@@ -176,6 +272,27 @@ function negatives(entries: Chain) {
       base: 1,
       entry: entry(e0, { op: "add", signer: did(A), add: [weak] }, [A]),
       error: "roster-key",
+    },
+    {
+      name: "mixed-order-key",
+      base: 1,
+      entry: {
+        ...mixedAdd,
+        sigs: {
+          ...mixedAdd.sigs,
+          [mixedDid]: toB64(signBothEquations(mixed, signingBytes(mixedAdd))),
+        },
+      },
+      error: "roster-key",
+    },
+    {
+      name: "small-order-r",
+      base: 1,
+      entry: {
+        ...identityR,
+        sigs: { [did(A)]: toB64(signIdentityR(A.sigSeed, signingBytes(identityR))) },
+      },
+      error: "roster-signature",
     },
     {
       name: "readd-removed-device",
@@ -237,6 +354,20 @@ function negatives(entries: Chain) {
         [R1, D],
       ),
       error: "roster-signer",
+    },
+    refusedMeta("meta-not-base64url", "not base64url!"),
+    refusedMeta("meta-padded", "AAAA="),
+    refusedMeta("meta-non-ascii", "\u20ac"),
+    refusedMeta("meta-trailing-newline", "AAAA\n"),
+    refusedMeta("meta-empty-value", ""),
+    {
+      name: "empty-meta",
+      base: 1,
+      entry: entry(e0, { op: "add", signer: did(A), add: [subject(C, "device")], meta: {} }, [
+        A,
+        C,
+      ]),
+      error: "roster-format",
     },
     {
       name: "leave-by-non-member",
@@ -330,6 +461,174 @@ function forks(entries: Chain) {
   ];
 }
 
+/** Entries on top of the chain, each case applying `steps` in order, the last refused or giving `state`. */
+function replacements(entries: Chain) {
+  const [, , e2, , , , , , e8] = entries;
+  const R3 = memberSecrets(rand("R3 sig"), rand("R3 kem"));
+  const E = memberSecrets(rand("E sig"), rand("E kem"));
+  const N = memberSecrets(rand("N sig"), rand("N kem"));
+  const newKey = (label: string, n: number, members: MemberSecrets[]) =>
+    epochDraft(rand(`replacement ${label}`), group, n, members);
+  const removeC = (replace: boolean, cut = false) =>
+    entry(
+      e8,
+      {
+        op: "remove",
+        signer: did(A),
+        remove: replace ? [did(C), did(R2)] : [did(C)],
+        ...(replace && { add: [subject(R3, "recovery")] }),
+        ...(cut && { cut: { [did(R2)]: { seq: 1, hash: hex(rand("an object")) } } }),
+        epoch: newKey("remove C", 5, replace ? [A, R3] : [A, R2]),
+      },
+      replace ? [A, R3] : [A],
+    );
+  const addE = entry(e8, { op: "add", signer: did(A), add: [subject(E, "device")] }, [A, E]);
+  const cLeaves = entry(addE, leaveDraft(C), [C]);
+  const removeE = (replace: boolean) =>
+    entry(
+      cLeaves,
+      {
+        op: "remove",
+        signer: did(A),
+        remove: replace ? [did(E), did(R2)] : [did(E)],
+        ...(replace && { add: [subject(R3, "recovery")] }),
+        epoch: newKey("remove E", 5, replace ? [A, R3] : [A, R2]),
+      },
+      replace ? [A, R3] : [A],
+    );
+  const replaced = entry(
+    cLeaves,
+    {
+      op: "recovery",
+      signer: did(A),
+      remove: [did(R2)],
+      add: [subject(R3, "recovery")],
+      epoch: newKey("after leave", 5, [A, E, R3]),
+    },
+    [A, R3],
+  );
+  const rotated = entry(cLeaves, rotate(A, 4, [A, E, R2]), [A]);
+  const notDue = entry(
+    e2,
+    {
+      op: "remove",
+      signer: did(A),
+      remove: [did(B), did(R1)],
+      add: [subject(R2, "recovery")],
+      epoch: epoch(1, [A, R2]),
+    },
+    [A, R2],
+  );
+  const restoreN = entry(
+    e8,
+    {
+      op: "restore",
+      signer: did(R2),
+      add: [subject(N, "device")],
+      epoch: newKey("restore N", 5, [A, C, N, R2]),
+    },
+    [R2, N],
+  );
+  const replaceAfterRestore = entry(
+    restoreN,
+    {
+      op: "recovery",
+      signer: did(N),
+      remove: [did(R2)],
+      add: [subject(R3, "recovery")],
+      epoch: newKey("replace after restore", 6, [A, C, N, R3]),
+    },
+    [N, R3],
+  );
+  const removeOthers = entry(
+    replaceAfterRestore,
+    {
+      op: "remove",
+      signer: did(N),
+      remove: [did(A), did(C)].sort(),
+      cut: { [did(A)]: { seq: 1, hash: hex(rand("last object of A")) } },
+      epoch: newKey("remove others", 7, [N, R3]),
+    },
+    [N],
+  );
+  const view = (...steps: Entry[]) => stateView(replayRoster([...entries, ...steps]));
+  // "AB" and "A" can't be decoded strictly, and a value is opaque until its device opens it.
+  const opaqueMeta = (value: string) =>
+    entry(e8, { op: "rename", signer: did(A), meta: { [did(A)]: value } }, [A]);
+  return [
+    {
+      name: "meta-with-trailing-bits",
+      steps: [opaqueMeta("AB")],
+      state: view(opaqueMeta("AB")),
+    },
+    {
+      name: "meta-of-an-undecodable-length",
+      steps: [opaqueMeta("A")],
+      state: view(opaqueMeta("A")),
+    },
+    {
+      name: "removing-the-device-that-set-the-key-replaces-it",
+      steps: [removeC(true)],
+      state: view(removeC(true)),
+    },
+    {
+      name: "removing-the-device-that-set-the-key-without-replacing",
+      steps: [removeC(false)],
+      error: "roster-op",
+    },
+    { name: "cut-for-the-replaced-key", steps: [removeC(true, true)], error: "roster-op" },
+    {
+      name: "the-device-that-set-the-key-left",
+      steps: [addE, cLeaves],
+      state: view(addE, cLeaves),
+    },
+    { name: "rotate-while-the-key-is-due", steps: [addE, cLeaves, rotated], error: "roster-op" },
+    {
+      name: "removal-while-the-key-is-due-without-replacing",
+      steps: [addE, cLeaves, removeE(false)],
+      error: "roster-op",
+    },
+    {
+      name: "removal-while-the-key-is-due",
+      steps: [addE, cLeaves, removeE(true)],
+      state: view(addE, cLeaves, removeE(true)),
+    },
+    {
+      name: "new-words-after-the-device-left",
+      steps: [addE, cLeaves, replaced],
+      state: view(addE, cLeaves, replaced),
+    },
+    { name: "replacement-not-called-for", base: 3, steps: [notDue], error: "roster-op" },
+    {
+      name: "restore-then-remove-the-other-devices",
+      steps: [restoreN, replaceAfterRestore, removeOthers],
+      state: view(restoreN, replaceAfterRestore, removeOthers),
+    },
+  ];
+}
+
+/** A genesis whose group id isn't the one its keys commit to. */
+function geneses() {
+  const device = memberSecrets(rand("rival device sig"), rand("rival device kem"));
+  const rival = memberSecrets(rand("rival recovery sig"), rand("rival recovery kem"));
+  return [
+    {
+      name: "group-id-from-other-keys",
+      entry: entry(
+        undefined,
+        {
+          op: "genesis",
+          signer: did(device),
+          add: [subject(device, "device"), subject(rival, "recovery")],
+          epoch: epochDraft(rand("rival epoch"), group, 0, [device, rival]),
+        },
+        [device, rival],
+      ),
+      error: "roster-group",
+    },
+  ];
+}
+
 function metaContents(entries: Entry[]) {
   return entries.flatMap((e) => {
     const epoch = replayRoster(entries.slice(0, e.seq + 1)).epoch;
@@ -352,5 +651,7 @@ export function rosterVectors(): Vectors {
     states: entries.map((_, i) => stateView(replayRoster(entries.slice(0, i + 1)))),
     negatives: negatives(entries),
     forks: forks(entries),
+    replacements: replacements(entries),
+    geneses: geneses(),
   };
 }

@@ -7,6 +7,7 @@ export * from "./entries.ts";
 export * from "./envelope.ts";
 export * from "./epoch.ts";
 export * from "./errors.ts";
+export * from "./forks.ts";
 export * from "./kdf.ts";
 export * from "./keys.ts";
 export * from "./lan.ts";

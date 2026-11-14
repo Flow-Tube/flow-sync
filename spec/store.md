@@ -9,15 +9,15 @@ Paths are relative to a configurable root. Names use only lowercase `[0-9a-f._/-
 ```
 store.json                                     {"format":"FLOW-SYNC/2","group":"<hex>"}
 roster/<seq:16>-<hash:16>.r                    roster entry, canonical JSON
-keys/<epoch:8>/<did:32>.k                      HPKE wrap of K_e for one member, 80 bytes
-keys/<epoch:8>/chain.k                         history chain box (epoch > 0)
+keys/<epoch:8>/<kc:16>/<did:32>.k              HPKE wrap of K_e for one member, 80 bytes
+keys/<epoch:8>/<kc:16>/chain.k                 history chain box (epoch > 0)
 dev/<did:32>/log/<shard:16>/<seq:16>.o         log object (envelope), shard = seq >> 10
 dev/<did:32>/blob/<sha256:64>.b                snapshot blob
 pair/<slot:32>/<dir>-<seq:16>.p                pairing mailbox message, dir is a or b
 probe/<random:32>                              setup probe, deleted right after
 ```
 
-`<x:n>` is `x` in lowercase hex, zero-padded to `n` digits. `<hash:16>` is the first 8 bytes of the entry hash; `<slot:32>` is `Hash("pair", t)[0..16]`.
+`<x:n>` is `x` in lowercase hex, zero-padded to `n` digits. `<hash:16>` is the first 8 bytes of the entry hash; `<kc:16>` is the first 8 bytes of the epoch's `kc`, so entries that start the same epoch number on two sides of a fork keep their keys apart; `<slot:32>` is `Hash("pair", t)[0..16]`.
 
 ### Writing rules
 
@@ -48,6 +48,7 @@ Log objects (change batches, snapshot manifests, acks) and live messages share o
 | `0x01` | Change batch | `changes` |
 | `0x02` | Snapshot manifest | `snapshot` |
 | `0x03` | Acknowledgement | `ack` |
+| `0x04` | Store login | `store` |
 | `0x10` | Live message | `live` |
 
 The smallest valid envelope is 482 bytes: a 256-byte payload inside a box.
@@ -57,12 +58,22 @@ The smallest valid envelope is 482 bytes: a 256-byte payload inside a box.
 A reader MUST, in this order:
 
 1. Check the length (482 bytes to 4 MiB), the magic, a supported suite, the group id, and that `seq` is at most 2<sup>53</sup> − 1, the largest integer every implementation reads exactly.
-2. Find the sender in the roster as a member while `epoch` was in force. Objects written before a device's removal stay valid.
+2. Find the sender in the roster. It must have role `device`, and `epoch` must lie from the epoch in force when it was added up to the last epoch before its removal, or the epoch in force at its `leave`. A removed sender is read only up to its `cut`, along the chain that reaches the hash named there (see below). With no `cut`, nothing more of its log is read.
 3. Verify the signature with the sender's key. Signatures are checked before anything is decrypted.
 4. Check `seq` and `prev` against the sender's stream ([protocol.md](protocol.md#streams)), or the live counter for live messages.
-5. Open the box with `P_e,x` for the type, and decode the payload.
+5. Open the box with `P_e,x` for the type, and decode the payload. When the box doesn't open under the chain's key for `e`, try the key of each other held entry that starts `e` and stands ([protocol.md](protocol.md#forks)), unwrapped from the reader's own wrap at that entry's path. A device may have sealed under an entry that later lost by rank or hash. The key of an entry that fell is never used.
 
 A failure at any step discards the object. It is never partly applied.
+
+**A removed sender's chain.** Checking the `cut`'s hash on arrival would be too late, because the objects below it would already be applied. So when a removed sender's `cut` is above the reader's position, the reader first walks down: it fetches the object at the `cut`'s `seq`, checks that its SHA-256 is the hash the `cut` names, and follows `prev` the same way down to its own position, where the last `prev` must match the hash it last verified. It keeps only the hashes. Then it reads forward as usual, and each object must also have the hash found on the way down. If the walk fails, that sender stops, and only that sender. The chain is fixed by the signed `cut`, so a store can't make the walk longer than the real log.
+
+A store or a LAN peer can't hand a device an object of a removed sender above its `cut`: the device refuses it before holding it.
+
+### Store logins
+
+A store login object carries canonical JSON with the fields [`welcome`](protocol.md#messages) gives for that store, without its address: `{"k":"webdav","n":"<user>","w":"<password>"}` or `{"k":"s3","a":"<access key id>","s":"<secret>"}`. So it can't point a device at another store.
+
+A reader takes the login only when the object opens under the chain's key of the epoch in force, and its sender is a current device. The rule for older epochs in step 2 and the other keys in step 5 don't apply. Otherwise, and on a Flow server or a LAN group, it ignores the login, and the object still counts as read. See [Replacing a store's login](protocol.md#replacing-a-stores-login).
 
 ### Untrusted input
 
@@ -80,17 +91,17 @@ blob = Box(P_e,snapshot, "FLOW-SYNC/2 blob" ‖ group ‖ u32(e) ‖ did, payloa
 name = hex(SHA-256(blob))
 ```
 
-`e` and `did` are the epoch and sender of the manifest that lists the blob. The blob isn't signed: the signed manifest names its hash, so the reader checks the hash first. Blob content uses the change batch format: a header line, then records.
+`e` and `did` are the epoch and sender of the manifest that lists the blob. The blob isn't signed: the signed manifest names its hash, so the reader checks the hash first. It then opens the blob the way step 5 opens the manifest. Blob content uses the change batch format: a header line, then records.
 
 ## Pairing mailbox
 
-When pairing through a store, the member opens a slot and each side writes its messages ([protocol.md](protocol.md#pairing)) to `pair/<slot>/<dir>-<seq>.p` (`a` from the code's shower, `b` from the scanner). Each file is one box. The member deletes the slot when pairing ends or its 180 seconds run out. On the Flow server the mailbox is an API ([api.md](api.md)) with the same messages.
+When pairing through a store, the member opens a slot and each side writes its messages ([protocol.md](protocol.md#pairing)) to `pair/<slot>/<dir>-<seq>.p` (`a` from the code's shower, `b` from the scanner). The first file in each direction is the clear message that starts the [channel](protocol.md#channel), and each later file is one box. The member deletes the slot when pairing ends or its 180 seconds run out. On the Flow server the mailbox is an API ([api.md](api.md)) with the same messages.
 
 ## Backends
 
 ### Flow server
 
-The server stores this layout behind its API, indexes objects by sender and `seq`, and offers one cursor over all new objects. It linearizes roster appends, so roster forks can't happen there.
+The server stores this layout behind its API, indexes objects by sender and `seq`, and offers one cursor over all new objects. It linearizes roster appends, so honest roster forks can't happen there, and a device treats a changed history as misbehaviour ([protocol.md](protocol.md#what-a-device-does-with-a-stores-answer)). Only one entry can start an epoch there, so its [API](api.md) names a wrap by epoch alone, without `<kc:16>`. A device checks that wrap against the full `kc` as on any other store.
 
 ### S3-compatible
 

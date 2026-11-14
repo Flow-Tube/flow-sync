@@ -17,6 +17,17 @@ export function memberId(sigPublic: Uint8Array, kemPublic: Uint8Array): Uint8Arr
   return labeledHash("device", concat(sigPublic, kemPublic)).subarray(0, 16);
 }
 
+/** The id of a group commits to the keys of its genesis (spec/crypto.md, Group id). */
+export function groupId(
+  device: Pick<MemberKeys, "sigPublic" | "kemPublic">,
+  recovery: Pick<MemberKeys, "sigPublic" | "kemPublic">,
+): Uint8Array {
+  return labeledHash(
+    "group",
+    concat(device.sigPublic, device.kemPublic, recovery.sigPublic, recovery.kemPublic),
+  ).subarray(0, 16);
+}
+
 export function memberSecrets(sigSeed: Uint8Array, kemSecret: Uint8Array): MemberSecrets {
   const sigPublic = signingPublicKey(sigSeed);
   const kemPublic = agreementPublicKey(kemSecret);
