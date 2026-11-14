@@ -13,6 +13,6 @@
     "vectors": "pnpm --filter @flow-sync/protocol vectors"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.6.3"
+    "@biomejs/biome": "^2.6.6"
   }
 }
