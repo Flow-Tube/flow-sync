@@ -7,7 +7,7 @@ const access = "private";
 export function openVercelBlobs(): BlobStore {
   return {
     async put(hash, data) {
-      await put(BLOB_PREFIX + hash, new Blob([data]), {
+      await put(BLOB_PREFIX + hash, new Blob([data.slice()]), {
         access,
         addRandomSuffix: false,
         allowOverwrite: true,

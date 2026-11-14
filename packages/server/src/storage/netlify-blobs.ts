@@ -13,7 +13,7 @@ export function openNetlifyBlobs(options: GetStoreOptions): BlobStore {
   };
   return {
     async put(hash, data) {
-      await store().set(hash, new Blob([data]));
+      await store().set(hash, new Blob([data.slice()]));
     },
     async get(hash) {
       const data = await store().get(hash, { type: "arrayBuffer" });
