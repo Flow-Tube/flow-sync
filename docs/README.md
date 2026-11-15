@@ -5,6 +5,7 @@ The same server runs on every host below. Pick one, follow its guide, then claim
 | Host | Storage | Live (handoff, remote control) | Cost | Guide |
 |---|---|---|---|---|
 | Docker (VPS, Synology, Unraid, TrueNAS) | SQLite on a volume | yes | your hardware | [deploy/docker](../deploy/docker/README.md) |
+| Linux with systemd, no Docker | SQLite | yes | your hardware | [bare-metal.md](bare-metal.md) |
 | Cloudflare Workers | D1 + R2, live on a Durable Object | yes | free, or $5/month | [cloudflare.md](cloudflare.md) |
 | Vercel | Postgres (Neon) + Vercel Blob | no | free (Hobby, non-commercial) | [vercel.md](vercel.md) |
 | Netlify | Netlify Database + Netlify Blobs | no | free credits, or $9/month | [netlify.md](netlify.md) |

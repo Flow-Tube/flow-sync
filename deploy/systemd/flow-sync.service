@@ -1,0 +1,53 @@
+# Flow sync server without Docker. Install it as /etc/systemd/system/flow-sync.service;
+# the steps are in docs/bare-metal.md.
+
+[Unit]
+Description=Flow sync server
+Documentation=https://github.com/Flow-Tube/flow-sync/blob/main/docs/bare-metal.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/node /opt/flow-sync/node.cjs
+Environment=NODE_ENV=production PORT=8080 FLOW_SYNC_DATA=%S/flow-sync/flow-sync.db FLOW_SYNC_TRUST_PROXY=1
+LoadCredential=admin_token:/etc/flow-sync/admin_token
+Environment=FLOW_SYNC_ADMIN_TOKEN_FILE=%d/admin_token
+Restart=on-failure
+
+DynamicUser=yes
+StateDirectory=flow-sync
+StateDirectoryMode=0700
+UMask=0077
+
+# Only a proxy on this host reaches the server, which is what makes FLOW_SYNC_TRUST_PROXY safe.
+# Both lines also block outgoing connections: remove them for Postgres or S3 on another host.
+IPAddressAllow=localhost
+IPAddressDeny=any
+
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateUsers=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+MemoryMax=512M
+TasksMax=100
+
+[Install]
+WantedBy=multi-user.target

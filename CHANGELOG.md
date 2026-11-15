@@ -17,6 +17,7 @@ The first release of FLOW-SYNC/2: linked devices for Flow for Android and Flow D
 
 - One group per instance. Runs on Node with SQLite or Postgres, optionally with object bytes in S3, and on Cloudflare Workers (D1, R2, Durable Object), Vercel and Netlify (no live features there).
 - Deployment templates and guides for Docker, Cloudflare Workers, Vercel, Netlify, Heroku, Railway, Render and Fly.io in `deploy/` and `docs/`.
+- A systemd unit and a guide for running the server without Docker.
 - Signed, reproducible container images with build provenance and an SBOM. Each release attaches a `compose.yaml` pinned to its image.
 - Security documentation: what the server can and can't see (`docs/security.md`), recovery (`docs/recovery.md`), and mappings to OWASP ASVS 5.0 Level 2 and the API Security Top 10.
 
