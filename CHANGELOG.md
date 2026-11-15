@@ -11,6 +11,7 @@ The first release of FLOW-SYNC/2: linked devices for Flow for Android and Flow D
 - A 24-word recovery key restores the group onto a new device.
 - Stores: a Flow server, a WebDAV folder, or the local network only. The specification also defines S3-compatible storage, which the apps don't offer yet.
 - Profiles: each device chooses which of its profiles sync.
+- A device can leave collections out of a link, so the user chooses what each device syncs.
 - Live: "Play on" another device and remote control, through the server or over the local network.
 
 ### Server

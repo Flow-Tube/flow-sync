@@ -252,7 +252,7 @@ Each batch carries the records of one collection for one link, as a header line 
 - `link` is the profile link id, or `null` for `profiles`.
 - `head` is the sender's roster head when it wrote the batch. Two batches naming different heads for the same roster `seq` reveal a fork.
 
-Batches are deltas: records changed since the device's previous batch for that collection and link, taken from the apps' change ledgers. A receiver merges them with the existing FLOW-SYNC/1 merge rules, in one local transaction per batch, and skips collections it doesn't know (Desktop has no `notes`).
+Batches are deltas: records changed since the device's previous batch for that collection and link, taken from the apps' change ledgers. A receiver merges them with the existing FLOW-SYNC/1 merge rules, in one local transaction per batch, and skips collections it doesn't know.
 
 Clocks are hybrid logical clocks: a device persists the highest physical time of any stamp it has applied, and stamps a local edit with at least that time plus one millisecond, so an edit made after reading another device's change wins over it even when this device's clock is behind. Devices warn when their clock differs from the store's `Date` by more than 2 minutes, because last-writer-wins still follows device clocks.
 
@@ -273,6 +273,20 @@ Each device keeps its own map from local profile to link id; a link maps to at m
 - **Unlinking.** A device that stops syncing a profile removes it from its map and keeps its local data. It skips that link's later batches.
 - **Deleting.** A record with `deleted: true` retires the link for every device: each unlinks its profile and keeps the local data. Its batches no longer hold back [garbage collection](#garbage-collection), so a profile linked to it again starts from what the store still holds. A device that a delete leaves with no linked profile adds no devices until the user links one.
 
+### Leaving collections out
+
+A device MAY leave collections out of a link, so that the user chooses what that device syncs. `profiles` can't be left out. The choice is the device's own: it is never written to the store, and other devices don't need to know it.
+
+For a collection it leaves out of a link, a device:
+
+- writes no batches of that collection for that link;
+- drops that collection's batches for that link as it reads them, and from batches it kept for a profile that isn't active when it applies them. They still count as consumed;
+- writes no snapshots of that link, so every snapshot in the store holds every collection. Snapshots of the link come from the devices that keep it whole; when none do, the link has none and its logs are read from their first objects.
+
+[Garbage collection](#garbage-collection) needs a snapshot of the link that every device has acked, so while no device keeps a link whole, nothing of that link is collected and the store grows until it reaches its quota. Apps SHOULD say so when the user leaves a collection out.
+
+When a device takes a collection back, it reads that collection of the link the way it [reads a link from its snapshot](#reading-a-link-from-its-snapshot): it applies the collection from the newest snapshot of the link it can open, then that collection's batches in each log after the snapshot's `vv`, up to where it had already read. It sends its own changes to that collection only after that. Its next batch of the collection holds everything it changed since its last batch of it, including what it changed while the collection was left out.
+
 ### Snapshots
 
 A snapshot holds the merged state of one link (or of `profiles`) as blobs, plus a manifest in the writer's log:
@@ -283,7 +297,7 @@ A snapshot holds the merged state of one link (or of `profiles`) as blobs, plus 
 
 `vv` is the version vector the state includes: for each sender, the last `seq` merged and the SHA-256 of that object. Merges are state-based, so any device's snapshot is valid, and a new device can start from any snapshot and then read each log after `vv`. The first object it reads from sender X must have `seq` = `vv[X].seq` + 1 and `prev` = `vv[X].hash`, so the chain still holds once older objects are deleted.
 
-A device writes snapshots only of `profiles` and of the link of its active profile, once every batch it keeps for that link is applied; its state then includes everything its `vv` names. It SHOULD write one when it has merged more than 1 MiB of batches since the last snapshot of that link, when the last one is 7 days old, and after starting an epoch with `remove` or `rotate`.
+A device writes snapshots only of `profiles` and of the link of its active profile, unless it [leaves collections out](#leaving-collections-out) of that link, once every batch it keeps for that link is applied; its state then includes everything its `vv` names. It SHOULD write one when it has merged more than 1 MiB of batches since the last snapshot of that link, when the last one is 7 days old, and after starting an epoch with `remove` or `rotate`.
 
 #### Reading a link from its snapshot
 
@@ -291,7 +305,7 @@ A device starts reading a link when it bootstraps, and when it links a profile t
 
 ### Acknowledgements
 
-After applying, a device appends an ack: `{"vv":{"<did>":seq}}`, the last `seq` of every other sender it has consumed. A batch skipped on purpose (a link the device doesn't sync), or kept for a profile that isn't active, counts as consumed. A device has always read its own log, so its acks leave itself out. Acks aren't acknowledged: a device writes one only after consuming batches or snapshot manifests, and its next ack covers any acks it read before.
+After applying, a device appends an ack: `{"vv":{"<did>":seq}}`, the last `seq` of every other sender it has consumed. A batch skipped on purpose (a link the device doesn't sync, or a collection it [leaves out](#leaving-collections-out)), or kept for a profile that isn't active, counts as consumed. A device has always read its own log, so its acks leave itself out. Acks aren't acknowledged: a device writes one only after consuming batches or snapshot manifests, and its next ack covers any acks it read before.
 
 ### Garbage collection
 
