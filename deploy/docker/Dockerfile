@@ -13,7 +13,7 @@ COPY packages/protocol/src packages/protocol/src
 COPY packages/server/src packages/server/src
 RUN pnpm --filter @flow-sync/server build && mkdir -p /out/data
 
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:b8cec4b2f2126ff7bd034ec9ac207ffb3272667dfdc48376e3b035d3270549ba
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:6abfcb367ebc291572c774c1592a986be2ab26a2486f73093401327495a5962a
 COPY --from=build /src/packages/server/dist/ /app/
 COPY --from=build --chown=65532:65532 /out/data /data
 ENV NODE_ENV=production PORT=8080 FLOW_SYNC_DATA=/data/flow-sync.db
