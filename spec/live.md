@@ -72,7 +72,7 @@ The connecting device C opens a WebSocket to `ws://<address>:<port>/flow-sync/2`
 | 2 | S | `{"did": S, "n": b64(32 random bytes), "sig": b64(sign_S("FLOW-SYNC/2 lan server" ‖ n_C ‖ n_S ‖ C ‖ S))}` |
 | 3 | C | `{"sig": b64(sign_C("FLOW-SYNC/2 lan client" ‖ n_C ‖ n_S ‖ C ‖ S))}` |
 
-Messages 1 to 3 use `aad = "FLOW-SYNC/2 lan hello" ‖ u8(#)`. Each side checks that the other is a current device and that its signature verifies. Only members hold `P_e,lan`, so outsiders can't even complete message 1. After message 3:
+Messages 1 to 3 use `aad = "FLOW-SYNC/2 lan hello" ‖ u8(#)`. Each side checks that the other is a current device and that its signature verifies, with one exception: S also answers a C that its own roster shows as removed, when C was a device in epoch `e`, so C can [learn of its removal](#lan-groups). C never accepts a removed device as S. Only members hold `P_e,lan`, so outsiders can't even complete message 1. After message 3:
 
 ```
 K_cs = Derive(P_e,lan, n_C ‖ n_S, "lan c2s", C ‖ S, 32)
@@ -112,6 +112,7 @@ A group can live on its devices alone, with no store: its location is `{"k":"lan
 - **Appending.** A device writes the wraps and then the entry locally; the entry spreads as other devices pull `roster`. Concurrent entries settle by the [fork rule](protocol.md#forks): a member always pulls every entry a peer holds, so both see every candidate even when they pull at the same moment.
 - **Pairing.** Pairing always runs over the LAN. The member's `welcome` carries `{"k":"lan"}`, and also `entries` (every roster entry up to the head it names) and `wrap` (b64, the new device's wrap of the current epoch): the new device needs both before it can verify the roster or open a LAN session, which starts with `P_e,lan`. After `done`, the member waits up to 5 seconds for the scanner to close the pairing connection, then the devices sync as below.
 - **Leaving.** A device that appends a `leave` entry meets every member it can reach, for up to 10 seconds, so they pull the entry before it forgets the group. A member it couldn't reach stays listed until another device removes it.
+- **Removed devices.** A device removed while it was away has no store to read the removal from. When it dials a member under an epoch it was a device in, the member completes the hello and serves it the roster only: `key` and `get` answer `not_found`, `list` answers with empty `paths` and `blobs`, `put` answers `invalid`, and `live` messages are dropped. The member pulls nothing from it and doesn't keep its address. The removed device pulls `roster` as from any member, finds itself missing ([protocol.md](protocol.md#removal)) and stops.
 - **Syncing.** When two members meet, through mDNS or a remembered address, each one pulls from the other: `roster` with `after` -1, since an entry that lost can sit below its head, the wraps and chain boxes it lacks for its settled chain and for the entries that lost and [stand](protocol.md#forks), then `list` with its version vector and `get` for what it lacks. It merges what it read as from any store, and writes its own objects locally only.
 
 Groups on a store sync the same way when their devices meet, as well as through the store. For the roster, the store's answer decides while it answers ([protocol.md](protocol.md#what-a-device-does-with-a-stores-answer)).

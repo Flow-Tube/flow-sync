@@ -176,7 +176,7 @@ Old objects are not re-encrypted: the removed device already had them. They leav
 
 The `cut` is where that device's log ends. Readers stop there, so what it writes after its removal is never read ([store.md](store.md#reading-an-envelope)). A removed device with no `cut` has no objects anyone reads from then on. A device that had already read past the `cut` keeps what it applied. Objects above the `cut` that the signer hadn't read are dropped, so the user is told that recent changes from that device may not arrive. When a fork holds two removals of a device, the `cut` of the entry on the chain decides.
 
-A device that finds itself missing from a settled roster stops syncing and tells the user. It deletes its device keys and the group's epoch keys by itself only when the entry that removes it extends the chain it had applied and nothing is contested. In any other case it deletes them only when the user confirms. On a Flow server it can no longer read the roster: once the server refuses it a token, it stops syncing and tells the user, who can forget the group, which deletes the same keys.
+A device that finds itself missing from a settled roster stops syncing and tells the user. It deletes its device keys and the group's epoch keys by itself only when the entry that removes it extends the chain it had applied and nothing is contested. In any other case it deletes them only when the user confirms. On a Flow server it can no longer read the roster: once the server refuses it a token, it stops syncing and tells the user, who can forget the group, which deletes the same keys. On the LAN, the first member it reaches serves it the roster and nothing else ([live.md](live.md#lan-groups)).
 
 ## Replacing a store's login
 
