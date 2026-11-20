@@ -13,7 +13,7 @@
     "vectors": "node vectors/generate.ts"
   },
   "dependencies": {
-    "@hpke/core": "^1.10.0",
+    "@hpke/core": "^1.10.1",
     "@noble/ciphers": "^2.4.0",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
